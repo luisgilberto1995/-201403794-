@@ -3,6 +3,17 @@
 
 int main()
 {
-    printf("Hello world!\n");
+    int c;
+    int conteo;
+    char entrada[4];
+    c=getchar();
+    conteo = 0;
+    //printf(c);
+    while((conteo < 4) && (c != EOF)){
+        entrada[conteo] =c;
+        ++conteo;
+        c = getchar();
+    }
+    printf(entrada);
     return 0;
 }
