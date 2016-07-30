@@ -1,19 +1,24 @@
 #include <stdio.h>
 #include <stdlib.h>
+void minusculas(char *entrada)
+{
+    printf("minusculas");
+}
 
+void automata(char *entrada)
+{
+
+}
 int main()
 {
-    int c;
-    int conteo;
-    char entrada[4];
-    c=getchar();
-    conteo = 0;
-    //printf(c);
-    while((conteo < 4) && (c != EOF)){
-        entrada[conteo] =c;
-        ++conteo;
-        c = getchar();
-    }
-    printf(entrada);
+    int y = 5;
+    y = y * 9;
+    char numeritos[15];
+    printf("%d", y);
+    int i;
+    for(i = 0; i < y; i++)
+        {
+            printf("chicken");
+        }
     return 0;
 }
