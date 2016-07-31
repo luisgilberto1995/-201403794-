@@ -1,5 +1,7 @@
 # depslib dependency file v1.0
-1469906482 source:/home/luis/Documentos/CodeBlocks Projects/fase1/main.c
+1469937362 source:/home/luis/Documentos/CodeBlocks Projects/fase1/main.c
 	<stdio.h>
 	<stdlib.h>
+	<string.h>
+	<assert.h>
 
