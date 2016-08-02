@@ -4,36 +4,8 @@
 #include <assert.h>
 
 int estado;
+int tamanoArreglo;
 
-void minusculas(char **entrada)
-{
-    printf("minusculas");
-}
-
-void automata(char** entradaTotal, char* entradaUnica)
-{
-    printf("---------------\n");
-    printf("Metodo automata:\n\n\n");
-if (entradaTotal)
-    {
-        int i;
-        for (i = 0; *(entradaTotal + i); i++)
-        {
-            /*printf("Palabra =[%s]\n", *(entradaTotal + i));*/
-            free(*(entradaTotal + i));
-            if(strcmp(*(entradaTotal + i), entradaUnica)==0)
-                {
-                    printf("Encontrado!\n");
-                }else
-                {
-                    printf("NoEncontrado!\n");
-                }
-        }
-        printf("\n");
-        free(entradaTotal);
-    }
-    printf("\n\n");
-}
 char** str_split(char* a_str, const char a_delim)
 {
     char** result    = 0;
@@ -81,32 +53,236 @@ char** str_split(char* a_str, const char a_delim)
 
     return result;
 }
+void minusculas(char **entrada)
+{
+    printf("minusculas");
+}
+
+/*Contador de elementos*/
+int tamano(char **entradaTotal)
+{
+    int i;
+    /*printf("Calculando tamano...\n");*/
+    if (entradaTotal)/*se realizo el split correctamente*/
+    {
+        for (i = 0; *(entradaTotal + i); i++)
+        {
+            /*printf("Palabra =[%s]\n", *(entradaTotal + i));*/
+            /*free(*(entradaTotal + i));*/
+        }
+        printf("\n");
+        /*free(entradaTotal);*/
+    }
+    /*printf("El tamano es: ");
+    printf("%d", i);*/
+    return i;
+}
+
+int tamano2(char arreglo[])
+{
+    int i;
+    int d = 1;
+    /*printf("Calculando tamano2...\n");*/
+
+        for (i = 0; d == 1; ++i)
+        {
+            if(arreglo[i]=='\n'){break;}
+        }
+        printf("\n");
+
+    return i;
+}
+int contadorPuntos(char entrada[])
+{
+    int contadorPuntos = 0;
+    int tk;
+    for(tk = 0; entrada[tk]!='\0'; ++tk)
+        {
+            if(entrada[tk-1]==':')
+             {
+                contadorPuntos= contadorPuntos + 1;
+             }
+
+        }
+    /*printf("\nPuntos:");
+    printf("%d", contadorPuntos);
+    printf("\n");*/
+        return contadorPuntos/2;
+}
+char* getComando(char* comando)
+{
+    char** ArregloComando;
+    ArregloComando = str_split(comando, ':');
+    return *(ArregloComando + 0);
+}
+void automata(char** entradaTotal, char* entradaUnica, int posicion)
+{
+    printf("\n---------------\n");
+    printf("Metodo automata:\n\n\n");
+    /*-------------------------------------------------*/
+    char** elemento;
+    char* token = getComando(entradaUnica);
+    printf(token);
+    printf("\n-----\n");
+    /*LISTA DE PALABRAS
+     RESERVADAS*/
+    char *mkdisk = "mkdisk";
+    char *sizee = "-size";
+    char *unit = "+unit";
+    char *path = "-path";
+    char *name = "-name";
+
+    char *type = "+type";
+    char *fit = "+fit";
+    char *deletee = "+delete";
+    char *add = "+add";
+
+    if (entradaTotal)/*se realizo el split correctamente*/
+    {
+        if(estado==0)
+        {
+            if(strcmp(token, mkdisk)==0)
+            {
+                estado = 1;
+                printf("\nestado = 1");
+                automata(entradaTotal,*(entradaTotal + posicion+1), posicion+1);
+            }else
+            {
+                printf("\ncomando no reconocido\n");
+            }
+        }else if(estado==1)
+        {
+            if(strcmp(token, sizee) == 0)
+            {
+                estado = 2;
+                printf("\nestado = 2");
+                automata(entradaTotal,*(entradaTotal + posicion+1), posicion+1);
+            }
+        }else if(estado == 2)
+        {
+            if(strcmp(token, path) == 0)
+            {
+                estado = 3;
+                printf("\nestado = 3");
+                automata(entradaTotal,*(entradaTotal + posicion+1), posicion+1);
+            }else if(strcmp(token, unit) == 0)
+            {
+                estado = 4;
+                printf("\nestado = 4");
+                automata(entradaTotal,*(entradaTotal + posicion+1), posicion+1);
+            }
+        }else if(estado==3)
+        {
+            printf("\nrealizar accion sin unit para mkdisk");
+        }else if(estado==4)
+        {
+            if(strcmp(token, path) == 0)
+            {
+                estado = 3;
+                printf("\nestado = 3");
+                automata(entradaTotal,*(entradaTotal + posicion+1), posicion+1);
+            }
+        }
+
+        /*int i = 0;
+        for (i = 0; *(entradaTotal + i); i++)
+        {
+            if(strcmp(*(entradaTotal + i), mkdisk)==0)
+                {
+                    printf("Encontrado!\n");
+                }else
+                {
+                    printf("NoEncontrado!\n");
+                }
+        }
+        printf("\n");*/
+    }
+    /*printf("\n\n");*/
+}
+
+
+int getValorEntero(char* comando)
+{
+char** ArregloComando;
+    ArregloComando = str_split(comando, ':');
+    int resultado = atoi(*(ArregloComando + 1));
+    return resultado;
+}
 int main()
 {
     estado = 0;
-    /*int y = 5;
+    /*tamanoArreglo = 0;
+    int y = 5;
     y = y * 9;
     printf("%d", y);*/
     printf("Universidad de San Carlos de Guatemala\n");
     printf("Ingenieria en Ciencias y Sistemas\n");
     printf("Proyecto: Fase 1\n");
-    printf("                    [File System ext2/ext3]\n\n\n");
-    char entrada[256];
-    fgets(entrada, sizeof(entrada), stdin);
+    printf("                        [File System ext2/ext3]\n\n\n");
+
+
+    char entradaUsuario[256];
+    fgets(entradaUsuario, sizeof(entradaUsuario), stdin);
+    int puntos = contadorPuntos(entradaUsuario);
+    int tamanoarray = tamano2(entradaUsuario);
+    char entrada[sizeof(entradaUsuario)-puntos];
+    /*printf("%d", tamanoarray);*/
+    /*Habiendo definido un nuevo arreglo para la entrada, a la que se le
+    convertira sustituyendo cada par de dos puntos por uno solo*/
+    int d;
+    int paridad = 0;
+    int contador = 0;
+    for(d = 0; d<tamanoarray+1; d++)
+    {
+        if(entradaUsuario[d] ==':'){
+            if(paridad == 1)
+            {
+                paridad = 0;
+                entrada[contador] = entradaUsuario[d];
+                contador = contador+1;
+                /*printf("\n");
+                printf("Escribiendo en:");
+                printf("%d", contador);
+                printf("\n");*/
+            }else
+            {
+                paridad = 1;
+            }
+        }else
+        {
+            entrada[contador] = entradaUsuario[d];
+            /*printf("\n");
+            printf("Escribiendo en:");
+            printf("%d", contador);
+            printf("\n");*/
+            contador = contador +1;
+        }
+
+    }
+    /*printf("NUEVA ENTRADA:");
+    printf(entrada);*/
+    /*******************************/
+    /*Fin reescritura de la entrada*/
+    /*******************************/
+    /*******************************/
+    /*Iniciando el pseudoautomata y el analisis realizado por el mismo*/
+    /*******************************/
+    char** tokensSize;
     char** tokens;
     printf("Se ingresó:[%s]\n\n", entrada);
     tokens = str_split(entrada, ' ');
-    automata(tokens, *(tokens + 0));
-    /*if (tokens)
+    tamanoArreglo = tamano(tokens);
+    printf("\niniciando el automata...\n");
+    automata(tokens, *(tokens + 0), 0);
+    /*const char *userInput[tamanoArreglo];*/
+    if (tokens)
     {
         int i;
         for (i = 0; *(tokens + i); i++)
         {
-            printf("month=[%s]\n", *(tokens + i));
-            free(*(tokens + i));
+            printf("Ultima revision, palabra [%d]=[%s]\n", i, *(tokens + i));
         }
         printf("\n");
-        free(tokens);
-    }*/
+    }
     return 0;
 }
