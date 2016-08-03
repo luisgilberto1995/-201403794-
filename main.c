@@ -3,8 +3,19 @@
 #include <string.h>
 #include <assert.h>
 
-int estado;
-int tamanoArreglo;
+    int estado;
+    int tamanoArreglo;
+
+    int bool_mkdisk = 0;
+    int bool_sizee = 0;
+    int bool_unit = 0;
+    int bool_path = 0;
+    int bool_name = 0;
+
+    int bool_type = 0;
+    int bool_fit = 0;
+    int bool_deletee = 0;
+    int bool_add = 0;
 
 char** str_split(char* a_str, const char a_delim)
 {
@@ -92,6 +103,7 @@ int tamano2(char arreglo[])
 
     return i;
 }
+
 int contadorPuntos(char entrada[])
 {
     int contadorPuntos = 0;
@@ -109,12 +121,39 @@ int contadorPuntos(char entrada[])
     printf("\n");*/
         return contadorPuntos/2;
 }
-char* getComando(char* comando)
+char* getComando(char* comando)/*Enviar comando completo, devuelve valor del comando*/
 {
     char** ArregloComando;
     ArregloComando = str_split(comando, ':');
     return *(ArregloComando + 0);
 }
+char* getValorCadena(char comando[])/*Enviar comando completo, devuelve el valor de la cadena*/
+{
+    char** ArregloComando = str_split(comando, ':');
+    char* valor = *(ArregloComando +1);
+    int i = 0;
+    printf("[%s]",valor, "\n");
+    int tamanio = tamano2(comando);
+    for(i = 0; *(valor+i) != '\0' && *(valor+i) != NULL; i++){}
+    printf("\ntamano\n");
+    printf("[%d]\n", i);
+    char respuesta[i-1];
+    int d;
+    int count = 0;
+    for(d = 0; d< i-1; d++)
+    {
+        if(*(valor +d) != '"')
+        {
+            respuesta[count] = *(valor +d);
+            ++count;
+        }
+    }
+    printf("\n");
+    printf(respuesta);
+    printf("\n");
+    return respuesta;
+}
+
 void automata(char** entradaTotal, char* entradaUnica, int posicion)
 {
     printf("\n---------------\n");
@@ -137,77 +176,66 @@ void automata(char** entradaTotal, char* entradaUnica, int posicion)
     char *deletee = "+delete";
     char *add = "+add";
 
-    if (entradaTotal)/*se realizo el split correctamente*/
+    if (posicion < tamanoArreglo)/*se realizo el split correctamente*/
     {
-        if(estado==0)
+        if(strcmp(token, mkdisk)==0)
         {
-            if(strcmp(token, mkdisk)==0)
-            {
-                estado = 1;
-                printf("\nestado = 1");
-                automata(entradaTotal,*(entradaTotal + posicion+1), posicion+1);
-            }else
-            {
-                printf("\ncomando no reconocido\n");
-            }
-        }else if(estado==1)
+            bool_mkdisk = 1;
+            printf("\nestado = 1");
+            automata(entradaTotal,*(entradaTotal + posicion+1), posicion+1);
+        }
+        else if(strcmp(token, sizee)==0)
         {
-            if(strcmp(token, sizee) == 0)
-            {
-                estado = 2;
-                printf("\nestado = 2");
-                automata(entradaTotal,*(entradaTotal + posicion+1), posicion+1);
-            }
-        }else if(estado == 2)
+            bool_mkdisk = 1;
+        }
+        else if(strcmp(token, unit)==0)
         {
-            if(strcmp(token, path) == 0)
-            {
-                estado = 3;
-                printf("\nestado = 3");
-                automata(entradaTotal,*(entradaTotal + posicion+1), posicion+1);
-            }else if(strcmp(token, unit) == 0)
-            {
-                estado = 4;
-                printf("\nestado = 4");
-                automata(entradaTotal,*(entradaTotal + posicion+1), posicion+1);
-            }
-        }else if(estado==3)
+            bool_unit = 1;
+        }
+        else if(strcmp(token, path)==0)
         {
-            printf("\nrealizar accion sin unit para mkdisk");
-        }else if(estado==4)
+            bool_path = 1;
+        }
+        else if(strcmp(token, type)==0)
         {
-            if(strcmp(token, path) == 0)
-            {
-                estado = 3;
-                printf("\nestado = 3");
-                automata(entradaTotal,*(entradaTotal + posicion+1), posicion+1);
-            }
+            bool_type = 1;
+        }
+        else if(strcmp(token, name)==0)
+        {
+            bool_name = 1;
+        }
+        else if(strcmp(token, fit)==0)
+        {
+            bool_fit = 1;
+        }
+        else if(strcmp(token, deletee)==0)
+        {
+            bool_deletee = 1;
+        }
+        else if(strcmp(token, add)==0)
+        {
+            bool_add = 1;
         }
 
-        /*int i = 0;
-        for (i = 0; *(entradaTotal + i); i++)
-        {
-            if(strcmp(*(entradaTotal + i), mkdisk)==0)
-                {
-                    printf("Encontrado!\n");
-                }else
-                {
-                    printf("NoEncontrado!\n");
-                }
-        }
-        printf("\n");*/
+    }else
+    {
+        printf("\nDesborde\n");
     }
     /*printf("\n\n");*/
 }
 
-
-int getValorEntero(char* comando)
+void master_Driver()
 {
-char** ArregloComando;
-    ArregloComando = str_split(comando, ':');
-    int resultado = atoi(*(ArregloComando + 1));
-    return resultado;
+    if(bool_mkdisk == 1)
+    {
+        /*Comando mkdisk utilizado*/
+        if(bool_sizee==1 && bool_unit==1 && bool_path==1 && bool_name==1)
+        {
+
+        }
+    }
 }
+
 int main()
 {
     estado = 0;
@@ -220,10 +248,9 @@ int main()
     printf("Proyecto: Fase 1\n");
     printf("                        [File System ext2/ext3]\n\n\n");
 
-
     char entradaUsuario[256];
     fgets(entradaUsuario, sizeof(entradaUsuario), stdin);
-    int puntos = contadorPuntos(entradaUsuario);
+    int puntos = contadorPuntos(entradaUsuario);/*regresa la cant de :/2*/
     int tamanoarray = tamano2(entradaUsuario);
     char entrada[sizeof(entradaUsuario)-puntos];
     /*printf("%d", tamanoarray);*/
@@ -267,14 +294,14 @@ int main()
     /*******************************/
     /*Iniciando el pseudoautomata y el analisis realizado por el mismo*/
     /*******************************/
-    char** tokensSize;
     char** tokens;
     printf("Se ingresó:[%s]\n\n", entrada);
     tokens = str_split(entrada, ' ');
     tamanoArreglo = tamano(tokens);
-    printf("\niniciando el automata...\n");
+    printf("\nIniciando el automata...\n");
     automata(tokens, *(tokens + 0), 0);
-    /*const char *userInput[tamanoArreglo];*/
+    master_Driver();
+    /*getValorCadena(*(tokens + 0));*/
     if (tokens)
     {
         int i;
