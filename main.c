@@ -2,10 +2,17 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
     int estado;
     int tamanoArreglo;
-
+    char** arreglo;
+    /**/
+    /*----------------------------*/
+    /*Banderas reservadas*/
+    /*----------------------------*/
     int bool_mkdisk = 0;
     int bool_sizee = 0;
     int bool_unit = 0;
@@ -16,12 +23,25 @@
     int bool_fit = 0;
     int bool_deletee = 0;
     int bool_add = 0;
+    /*----------------------------*/
+    /*Banderas reservadas*/
+    /*----------------------------*/
+    int val_size = 0;
+    char val_unit[1] = "m";
+    char* val_direccion;
+    char *nombre;
+
+
+    /*----------------------------*/
+    /*Valores reservados*/
+    /*----------------------------*/
 
 char** str_split(char* a_str, const char a_delim)
 {
     char** result    = 0;
     size_t count     = 0;
-    char* tmp        = a_str;
+    char *s = strdup(a_str);
+    char* tmp        = s;
     char* last_comma = 0;
     char delim[2];
     delim[0] = a_delim;
@@ -39,7 +59,7 @@ char** str_split(char* a_str, const char a_delim)
     }
 
     /* Add space for trailing token. */
-    count += last_comma < (a_str + strlen(a_str) - 1);
+    count += last_comma < (s + strlen(s) - 1);
 
     /* Add space for terminating null string so caller
        knows where the list of returned strings ends. */
@@ -50,7 +70,7 @@ char** str_split(char* a_str, const char a_delim)
     if (result)
     {
         size_t idx  = 0;
-        char* token = strtok(a_str, delim);
+        char* token = strtok(s, delim);
 
         while (token)
         {
@@ -63,6 +83,40 @@ char** str_split(char* a_str, const char a_delim)
     }
 
     return result;
+}
+
+void removeSubstring(char *s, const char *toremove)
+{
+    while( s = strstr(s, toremove))
+    {
+        memmove(s, s+strlen(toremove), 1+strlen(s+strlen(toremove)));
+    }
+}
+
+void crearDisco()
+{
+    printf("\nCreando disco...\n");
+    int t_bytes = 0;
+    struct stat st = {0};
+    char string[32];
+    if(val_unit[0] == 'k')
+    {
+        t_bytes = 1024 * val_size;
+    }
+    else if(val_unit[0] == 'm')
+    {
+        t_bytes = 1024 * 1024 * val_size;
+    }
+    if(stat(val_direccion, &st) == -1)
+    {
+        printf("\ncreando carpeta\n");
+
+        mkdir(val_direccion, 0700);
+        printf("\ncarpeta creada\n");
+    }else
+    {
+        printf("ya fue creada");
+    }
 }
 void minusculas(char **entrada)
 {
@@ -121,47 +175,64 @@ int contadorPuntos(char entrada[])
     printf("\n");*/
         return contadorPuntos/2;
 }
-char* getComando(char* comando)/*Enviar comando completo, devuelve valor del comando*/
+char* getComando(char comando[])/*Enviar comando completo, devuelve valor del comando*/
 {
     char** ArregloComando;
     ArregloComando = str_split(comando, ':');
     return *(ArregloComando + 0);
 }
-char* getValorCadena(char comando[])/*Enviar comando completo, devuelve el valor de la cadena*/
+char* getTexto(char comando[])/*Enviar comando completo, devuelve valor del comando*/
+{
+    char** ArregloComando;
+    ArregloComando = str_split(comando, ':');
+    return *(ArregloComando + 1);
+}
+int getValorEntero(char* comando)/*Enviar comando completo, devuelve valor del comando*/
+{
+    printf("\ngetValorEntero\n");
+    int respuesta = 0;
+    char** ArregloComando;
+    ArregloComando = str_split(comando, ':');
+    sscanf(*(ArregloComando +1), "%d", &respuesta);
+    printf("[%d]", respuesta);
+    return respuesta;
+}
+char *getValorCadena(char *comando)/*Enviar comando completo, devuelve el valor de la cadena*/
 {
     char** ArregloComando = str_split(comando, ':');
     char* valor = *(ArregloComando +1);
     int i = 0;
-    printf("[%s]",valor, "\n");
+    printf("lllllll[%s]",valor, "\n");
     int tamanio = tamano2(comando);
     for(i = 0; *(valor+i) != '\0' && *(valor+i) != NULL; i++){}
     printf("\ntamano\n");
     printf("[%d]\n", i);
-    char respuesta[i-1];
+    char *respuesta;
+    respuesta =(char*)malloc(tamanio-1);
     int d;
     int count = 0;
     for(d = 0; d< i-1; d++)
     {
         if(*(valor +d) != '"')
         {
-            respuesta[count] = *(valor +d);
+            *(respuesta + count) = *(valor +d);
             ++count;
         }
     }
-    printf("\n");
+    printf("\n*******************");
     printf(respuesta);
-    printf("\n");
+    printf("\n********************");
     return respuesta;
 }
 
 void automata(char** entradaTotal, char* entradaUnica, int posicion)
 {
     printf("\n---------------\n");
-    printf("Metodo automata:\n\n\n");
+    printf("Metodo automata:\n");
     /*-------------------------------------------------*/
-    char** elemento;
-    char* token = getComando(entradaUnica);
-    printf(token);
+    char* token = getComando(*(entradaTotal+posicion));
+    printf("-----\n");
+    printf(*(entradaTotal + posicion));
     printf("\n-----\n");
     /*LISTA DE PALABRAS
      RESERVADAS*/
@@ -175,9 +246,9 @@ void automata(char** entradaTotal, char* entradaUnica, int posicion)
     char *fit = "+fit";
     char *deletee = "+delete";
     char *add = "+add";
-
     if (posicion < tamanoArreglo)/*se realizo el split correctamente*/
     {
+
         if(strcmp(token, mkdisk)==0)
         {
             bool_mkdisk = 1;
@@ -186,35 +257,54 @@ void automata(char** entradaTotal, char* entradaUnica, int posicion)
         }
         else if(strcmp(token, sizee)==0)
         {
-            bool_mkdisk = 1;
+            bool_sizee = 1;
+            printf("\nEstado = 2\n");
+            printf(*(entradaTotal + posicion));
+            val_size = getValorEntero(*(entradaTotal + posicion));
+            automata(entradaTotal,*(entradaTotal + posicion+1), posicion+1);
         }
         else if(strcmp(token, unit)==0)
         {
             bool_unit = 1;
+            char* unidad = getTexto(*(entradaTotal + posicion));
+            val_unit[0] = unidad[0];
+            printf("%c\n", val_unit[0]);
+            printf("\nEstado = 3\n");
+            automata(entradaTotal,*(entradaTotal + posicion+1), posicion+1);
         }
         else if(strcmp(token, path)==0)
         {
             bool_path = 1;
+            val_direccion = getValorCadena(*(entradaTotal + posicion));
+            printf("\nautomata dice:\n");
+            printf(val_direccion);
+            automata(entradaTotal,*(entradaTotal + posicion+1), posicion+1);
         }
         else if(strcmp(token, type)==0)
         {
             bool_type = 1;
+            automata(entradaTotal,*(entradaTotal + posicion+1), posicion+1);
         }
         else if(strcmp(token, name)==0)
         {
             bool_name = 1;
+            nombre = getValorCadena(*(entradaTotal + posicion));
+            automata(entradaTotal,*(entradaTotal + posicion+1), posicion+1);
         }
         else if(strcmp(token, fit)==0)
         {
             bool_fit = 1;
+            automata(entradaTotal,*(entradaTotal + posicion+1), posicion+1);
         }
         else if(strcmp(token, deletee)==0)
         {
             bool_deletee = 1;
+            automata(entradaTotal,*(entradaTotal + posicion+1), posicion+1);
         }
         else if(strcmp(token, add)==0)
         {
             bool_add = 1;
+            automata(entradaTotal,*(entradaTotal + posicion+1), posicion+1);
         }
 
     }else
@@ -226,12 +316,21 @@ void automata(char** entradaTotal, char* entradaUnica, int posicion)
 
 void master_Driver()
 {
+
     if(bool_mkdisk == 1)
     {
         /*Comando mkdisk utilizado*/
         if(bool_sizee==1 && bool_unit==1 && bool_path==1 && bool_name==1)
         {
-
+            crearDisco();
+        }
+        else if(bool_sizee==1 && bool_unit==0 && bool_path==1 && bool_name==1)
+        {
+            crearDisco();
+        }
+        else
+        {
+            printf("Error, comando no reconocido.");
         }
     }
 }
@@ -297,6 +396,7 @@ int main()
     char** tokens;
     printf("Se ingresó:[%s]\n\n", entrada);
     tokens = str_split(entrada, ' ');
+    printf("Despues:[%s]\n\n", entrada);
     tamanoArreglo = tamano(tokens);
     printf("\nIniciando el automata...\n");
     automata(tokens, *(tokens + 0), 0);
