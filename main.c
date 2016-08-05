@@ -29,7 +29,7 @@
     int val_size = 0;
     char val_unit[1] = "m";
     char* val_direccion;
-    char *nombre;
+    char* nombre;
 
 
     /*----------------------------*/
@@ -85,12 +85,90 @@ char** str_split(char* a_str, const char a_delim)
     return result;
 }
 
-void removeSubstring(char *s, const char *toremove)
+int tamano3(char *arreglo)
 {
-    while( s = strstr(s, toremove))
+    int i = 0;
+    while (*(arreglo+i) != '\0' && arreglo != NULL )
     {
-        memmove(s, s+strlen(toremove), 1+strlen(s+strlen(toremove)));
+        ++i;
     }
+    return i+1;
+}
+
+char *arregloDireccion(char *comando)
+{
+    int tamanio = contadorDiagonales(val_direccion);
+    int tamanioTotal = tamano3(val_direccion);
+    char *respuesta;
+    respuesta =(char*)malloc(tamanio +tamanioTotal);
+    int d;
+    int count = 0;
+    int bul = 0;
+    for(d = 0; d < tamanio +tamanioTotal -1; d++)
+    {
+        if(*(val_direccion+d) == '/')
+        {
+            if(bul == 0)
+            {
+                bul = 1;
+                *(respuesta + count) = *(val_direccion +d);
+                ++count;
+            }else
+            {
+                *(respuesta + count) = '.';
+                ++count;
+                *(respuesta + count) = *(val_direccion +d);
+                ++count;
+            }
+        }
+        else
+        {
+            *(respuesta + count) = *(val_direccion +d);
+            ++count;
+        }
+    }
+    printf("\n&&&&&&&&&&&&&&&&&&&&\n");
+    printf(respuesta);
+    printf("\n&&&&&&&&&&&&&&&&&&&&");
+    return respuesta;
+}
+
+char *concatenarDireccion(char **arregloDirecciones, int direcciones)
+{
+    char *respuesta;
+    int maximos[direcciones];
+    int tamanos[direcciones];
+    if(direcciones == 1)
+    {
+        return *(arregloDirecciones +0);
+    }else
+    {
+        int i;
+        int j;
+        int count = 0;
+        int tamanio = 0;
+        for(i=0; i < direcciones; i++)
+        {
+            tamanio = tamanio + tamano3(*(arregloDirecciones+i));
+            tamanos[i] = tamano3(*(arregloDirecciones+i));
+            maximos[i] = tamanio;
+        }
+        printf("tamanio:%d", tamanio);
+        respuesta =(char*)malloc(tamanio+1);
+        for(i = 0; i < direcciones; i++)
+        {
+            char *actual = *(arregloDirecciones + i);
+            for(j = 0; j< tamanos[i]; j++)
+            {
+                *(respuesta + count) = *(actual+j);
+                ++count;
+            }
+        }
+    }
+    printf("\n++++++++++++++++++++\n");
+    printf(respuesta);
+    printf("\n++++++++++++++++++++++");
+    return respuesta;
 }
 
 void crearDisco()
@@ -107,15 +185,52 @@ void crearDisco()
     {
         t_bytes = 1024 * 1024 * val_size;
     }
+
     if(stat(val_direccion, &st) == -1)
     {
-        printf("\ncreando carpeta\n");
-
-        mkdir(val_direccion, 0700);
-        printf("\ncarpeta creada\n");
+        printf("\nCreando carpeta...\n");
+        char *paraSplit;
+        char *direccionActual;
+        paraSplit = arregloDireccion(val_direccion);
+        char** carpetas = str_split(paraSplit ,'.');
+        int carpetas_count = tamano(carpetas);
+        int b = 0;
+        while(b < carpetas_count)
+        {
+            direccionActual = concatenarDireccion(carpetas, b+1);
+            printf("[");
+            printf(direccionActual);
+            printf("]");
+            if(stat(direccionActual, &st) == -1)
+            {
+                printf("\nno existe\n");
+                mkdir(direccionActual, 0700);
+                printf("Ahora ya existe\n");
+            }
+            else
+            {
+                printf("\nsi existe\n");
+            }
+            ++b;
+        }
+        printf("\nCreando archivo...\n");
+        printf(nombre);
+        printf("\n....\n");
+        FILE *fp = fopen(val_direccion+nombre, "w");
+        fseek(fp, t_bytes , SEEK_SET);
+        fputc('\0', fp);
+        fclose(fp);
+        /*mkdir(val_direccion, 0700);*/
     }else
     {
-        printf("ya fue creada");
+        printf("[Ya fue creada la carpeta]");
+        printf("\nCreando archivo...\n");
+        printf(nombre);
+        printf("\n....\n");
+        FILE *fp = fopen(val_direccion+nombre, "w");
+        fseek(fp, t_bytes , SEEK_SET);
+        fputc('\0', fp);
+        fclose(fp);
     }
 }
 void minusculas(char **entrada)
@@ -175,6 +290,24 @@ int contadorPuntos(char entrada[])
     printf("\n");*/
         return contadorPuntos/2;
 }
+
+int contadorDiagonales(char entrada[])
+{
+    int contadorPuntos = 0;
+    int tk;
+    for(tk = 0; entrada[tk]!='\0'; ++tk)
+        {
+            if(entrada[tk-1]=='/')
+             {
+                contadorPuntos= contadorPuntos + 1;
+             }
+
+        }
+    /*printf("\nPuntos:");
+    printf("%d", contadorPuntos);
+    printf("\n");*/
+        return contadorPuntos;
+}
 char* getComando(char comando[])/*Enviar comando completo, devuelve valor del comando*/
 {
     char** ArregloComando;
@@ -224,7 +357,42 @@ char *getValorCadena(char *comando)/*Enviar comando completo, devuelve el valor 
     printf("\n********************");
     return respuesta;
 }
-
+char *getValorDisco(char *comando)/*Enviar comando completo, devuelve el valor de la cadena*/
+{
+    char** ArregloComando = str_split(comando, ':');
+    char* valor = *(ArregloComando +1);
+    int i = 0;
+    printf("lllllll[%s]",valor, "\n");
+    int tamanio = tamano2(comando);
+    for(i = 0; *(valor+i) != '\0' && *(valor+i) != NULL; i++){}
+    printf("\ntamano\n");
+    printf("[%d]\n", i);
+    char *respuesta;
+    respuesta =(char*)malloc(tamanio-1);
+    int d;
+    int count = 0;
+    int truee=0;
+    for(d = 0; d< i-1; d++)
+    {
+        if(*(valor +d) != '"')
+        {
+            if(truee == 0)
+            {
+                *(respuesta + count) = '/';
+                ++count;
+                truee = 1;
+            }else
+            {
+                *(respuesta + count) = *(valor +d);
+                ++count;
+            }
+        }
+    }
+    printf("\n*******************");
+    printf(respuesta);
+    printf("\n********************");
+    return respuesta;
+}
 void automata(char** entradaTotal, char* entradaUnica, int posicion)
 {
     printf("\n---------------\n");
@@ -252,13 +420,11 @@ void automata(char** entradaTotal, char* entradaUnica, int posicion)
         if(strcmp(token, mkdisk)==0)
         {
             bool_mkdisk = 1;
-            printf("\nestado = 1");
             automata(entradaTotal,*(entradaTotal + posicion+1), posicion+1);
         }
         else if(strcmp(token, sizee)==0)
         {
             bool_sizee = 1;
-            printf("\nEstado = 2\n");
             printf(*(entradaTotal + posicion));
             val_size = getValorEntero(*(entradaTotal + posicion));
             automata(entradaTotal,*(entradaTotal + posicion+1), posicion+1);
@@ -276,8 +442,6 @@ void automata(char** entradaTotal, char* entradaUnica, int posicion)
         {
             bool_path = 1;
             val_direccion = getValorCadena(*(entradaTotal + posicion));
-            printf("\nautomata dice:\n");
-            printf(val_direccion);
             automata(entradaTotal,*(entradaTotal + posicion+1), posicion+1);
         }
         else if(strcmp(token, type)==0)
@@ -288,7 +452,7 @@ void automata(char** entradaTotal, char* entradaUnica, int posicion)
         else if(strcmp(token, name)==0)
         {
             bool_name = 1;
-            nombre = getValorCadena(*(entradaTotal + posicion));
+            nombre = getValorDisco(*(entradaTotal + posicion));
             automata(entradaTotal,*(entradaTotal + posicion+1), posicion+1);
         }
         else if(strcmp(token, fit)==0)
@@ -311,7 +475,6 @@ void automata(char** entradaTotal, char* entradaUnica, int posicion)
     {
         printf("\nDesborde\n");
     }
-    /*printf("\n\n");*/
 }
 
 void master_Driver()
@@ -346,62 +509,56 @@ int main()
     printf("Ingenieria en Ciencias y Sistemas\n");
     printf("Proyecto: Fase 1\n");
     printf("                        [File System ext2/ext3]\n\n\n");
+    /*---------------------------------------------------------------*/
+    int exit = 0;
+    /*while(exit == 0)
+    {*/
+        char entradaUsuario[256];
+        fgets(entradaUsuario, sizeof(entradaUsuario), stdin);
+        int puntos = contadorPuntos(entradaUsuario);/*regresa la cant de :'s/2*/
+        int tamanoarray = tamano2(entradaUsuario);
+        char entrada[sizeof(entradaUsuario)-puntos];
 
-    char entradaUsuario[256];
-    fgets(entradaUsuario, sizeof(entradaUsuario), stdin);
-    int puntos = contadorPuntos(entradaUsuario);/*regresa la cant de :/2*/
-    int tamanoarray = tamano2(entradaUsuario);
-    char entrada[sizeof(entradaUsuario)-puntos];
-    /*printf("%d", tamanoarray);*/
-    /*Habiendo definido un nuevo arreglo para la entrada, a la que se le
-    convertira sustituyendo cada par de dos puntos por uno solo*/
-    int d;
-    int paridad = 0;
-    int contador = 0;
-    for(d = 0; d<tamanoarray+1; d++)
-    {
-        if(entradaUsuario[d] ==':'){
-            if(paridad == 1)
-            {
-                paridad = 0;
-                entrada[contador] = entradaUsuario[d];
-                contador = contador+1;
-                /*printf("\n");
-                printf("Escribiendo en:");
-                printf("%d", contador);
-                printf("\n");*/
+        /*Habiendo definido un nuevo arreglo para la entrada, a la que se le
+        convertira sustituyendo cada par de dos puntos por uno solo*/
+        int d;
+        int paridad = 0;/*simulador de booleano*/
+        int contador = 0;
+        for(d = 0; d<tamanoarray+1; d++)
+        {
+            if(entradaUsuario[d] ==':'){
+                if(paridad == 1)
+                {
+                    paridad = 0;
+                    entrada[contador] = entradaUsuario[d];
+                    contador = contador+1;
+                }else
+                {
+                    paridad = 1;
+                }
             }else
             {
-                paridad = 1;
+                entrada[contador] = entradaUsuario[d];
+                contador = contador +1;
             }
-        }else
-        {
-            entrada[contador] = entradaUsuario[d];
-            /*printf("\n");
-            printf("Escribiendo en:");
-            printf("%d", contador);
-            printf("\n");*/
-            contador = contador +1;
-        }
 
-    }
-    /*printf("NUEVA ENTRADA:");
-    printf(entrada);*/
-    /*******************************/
-    /*Fin reescritura de la entrada*/
-    /*******************************/
-    /*******************************/
-    /*Iniciando el pseudoautomata y el analisis realizado por el mismo*/
-    /*******************************/
-    char** tokens;
-    printf("Se ingresó:[%s]\n\n", entrada);
-    tokens = str_split(entrada, ' ');
-    printf("Despues:[%s]\n\n", entrada);
-    tamanoArreglo = tamano(tokens);
-    printf("\nIniciando el automata...\n");
-    automata(tokens, *(tokens + 0), 0);
-    master_Driver();
-    /*getValorCadena(*(tokens + 0));*/
+        }
+        /*******************************/
+        /*Fin reescritura de la entrada*/
+        /*******************************/
+        /*******************************/
+        /*Iniciando el pseudoautomata y el analisis realizado por el mismo*/
+        /*******************************/
+        char** tokens;
+        printf("Se ingresó:[%s]\n\n", entrada);
+        tokens = str_split(entrada, ' ');
+        printf("Despues:[%s]\n\n", entrada);
+        tamanoArreglo = tamano(tokens);
+        printf("\nIniciando el automata...\n");
+        automata(tokens, *(tokens + 0), 0);
+        master_Driver();
+    /*}*/
+    /*-------------------------------------------------------------*/
     if (tokens)
     {
         int i;
