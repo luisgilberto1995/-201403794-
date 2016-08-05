@@ -179,8 +179,8 @@ char *concatenacion(char *parametro1, char *parametro2)
     int char_tamano1 = tamano3(parametro1);
     int char_tamano2 = tamano3(parametro2);
     respuesta = malloc(char_tamano1 + char_tamano2 - 1);
-    strcpy(respuesta, parametro1); /* copy name into the new var */
-    strcat(respuesta, parametro2); /* add the extension */
+    strcpy(respuesta, parametro1);
+    strcat(respuesta, parametro2);
     printf("\nccccccccccccccccccc1\n");
     printf(respuesta);
     printf("\n-");
@@ -237,7 +237,6 @@ void crearDisco()
         fseek(fp, t_bytes , SEEK_SET);
         fputc('\0', fp);
         fclose(fp);
-        /*mkdir(val_direccion, 0700);*/
     }else
     {
         printf("[Ya fue creada la carpeta]");
