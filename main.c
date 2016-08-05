@@ -229,7 +229,7 @@ void crearDisco()
             }
             ++b;
         }
-        printf("\nCreando archivo...\n");
+        printf("\nCreando archivo\n");
         printf(nombre);
         printf("\n....\n");
         char *ubicacion = concatenacion(val_direccion, nombre);
