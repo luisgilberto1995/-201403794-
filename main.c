@@ -92,7 +92,7 @@ int tamano3(char *arreglo)
     {
         ++i;
     }
-    return i+1;
+    return i;
 }
 
 char *arregloDireccion(char *comando)
@@ -115,7 +115,7 @@ char *arregloDireccion(char *comando)
                 ++count;
             }else
             {
-                *(respuesta + count) = '.';
+                *(respuesta + count) = ',';
                 ++count;
                 *(respuesta + count) = *(val_direccion +d);
                 ++count;
@@ -140,9 +140,11 @@ char *concatenarDireccion(char **arregloDirecciones, int direcciones)
     int tamanos[direcciones];
     if(direcciones == 1)
     {
+        printf("direcciones[%d]", direcciones);
         return *(arregloDirecciones +0);
     }else
     {
+        printf("direcciones[%d]", direcciones);
         int i;
         int j;
         int count = 0;
@@ -171,6 +173,20 @@ char *concatenarDireccion(char **arregloDirecciones, int direcciones)
     return respuesta;
 }
 
+char *concatenacion(char *parametro1, char *parametro2)
+{
+    char *respuesta;
+    int char_tamano1 = tamano3(parametro1);
+    int char_tamano2 = tamano3(parametro2);
+    respuesta = malloc(char_tamano1 + char_tamano2 - 1);
+    strcpy(respuesta, parametro1); /* copy name into the new var */
+    strcat(respuesta, parametro2); /* add the extension */
+    printf("\nccccccccccccccccccc1\n");
+    printf(respuesta);
+    printf("\n-");
+    return respuesta;
+}
+
 void crearDisco()
 {
     printf("\nCreando disco...\n");
@@ -192,7 +208,7 @@ void crearDisco()
         char *paraSplit;
         char *direccionActual;
         paraSplit = arregloDireccion(val_direccion);
-        char** carpetas = str_split(paraSplit ,'.');
+        char** carpetas = str_split(paraSplit ,',');
         int carpetas_count = tamano(carpetas);
         int b = 0;
         while(b < carpetas_count)
@@ -216,7 +232,8 @@ void crearDisco()
         printf("\nCreando archivo...\n");
         printf(nombre);
         printf("\n....\n");
-        FILE *fp = fopen(val_direccion+nombre, "w");
+        char *ubicacion = concatenacion(val_direccion, nombre);
+        FILE *fp = fopen(ubicacion, "w");
         fseek(fp, t_bytes , SEEK_SET);
         fputc('\0', fp);
         fclose(fp);
@@ -227,7 +244,8 @@ void crearDisco()
         printf("\nCreando archivo...\n");
         printf(nombre);
         printf("\n....\n");
-        FILE *fp = fopen(val_direccion+nombre, "w");
+        char *ubicacion = concatenacion(val_direccion, nombre);
+        FILE *fp = fopen(ubicacion, "w");
         fseek(fp, t_bytes , SEEK_SET);
         fputc('\0', fp);
         fclose(fp);
@@ -368,24 +386,24 @@ char *getValorDisco(char *comando)/*Enviar comando completo, devuelve el valor d
     printf("\ntamano\n");
     printf("[%d]\n", i);
     char *respuesta;
-    respuesta =(char*)malloc(tamanio-1);
+    respuesta =(char*)malloc(tamanio);
     int d;
     int count = 0;
     int truee=0;
     for(d = 0; d< i-1; d++)
     {
-        if(*(valor +d) != '"')
+        if(*(valor +d) == '"')
         {
             if(truee == 0)
             {
                 *(respuesta + count) = '/';
                 ++count;
                 truee = 1;
-            }else
-            {
-                *(respuesta + count) = *(valor +d);
-                ++count;
             }
+        }else
+        {
+            *(respuesta + count) = *(valor +d);
+            ++count;
         }
     }
     printf("\n*******************");
@@ -414,6 +432,7 @@ void automata(char** entradaTotal, char* entradaUnica, int posicion)
     char *fit = "+fit";
     char *deletee = "+delete";
     char *add = "+add";
+    char *rmdisk = "rmdisk";
     if (posicion < tamanoArreglo)/*se realizo el split correctamente*/
     {
 
