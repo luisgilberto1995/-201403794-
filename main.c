@@ -9,11 +9,17 @@
     int estado;
     int tamanoArreglo;
     char** arreglo;
+    int particionado_disco_actual = 0;
+    int val_fit = 3;/*BF 1, FF 2, WF 3*/
+    int val_add = 0;
     /**/
     /*----------------------------*/
     /*Banderas reservadas*/
     /*----------------------------*/
     int bool_mkdisk = 0;
+    int bool_rmdisk = 0;
+    int bool_fdisk = 0;
+
     int bool_sizee = 0;
     int bool_unit = 0;
     int bool_path = 0;
@@ -24,17 +30,27 @@
     int bool_deletee = 0;
     int bool_add = 0;
     /*----------------------------*/
-    /*Banderas reservadas*/
+    /*     Banderas reservadas   */
     /*----------------------------*/
     int val_size = 0;
     char val_unit[1] = "m";
     char* val_direccion;
     char* nombre;
-
-
+    char* nombre_fdisk;
+    char val_type[1];
     /*----------------------------*/
     /*Valores reservados*/
     /*----------------------------*/
+
+    struct discoMBR
+    {
+        int tamanoDisco;/*En KB*/
+        int particiones;
+        int particiones_logicas;
+        int tipo[3];/*[1 primaria][2 extendida][3 logica]*/
+        char* nombreParticiones;
+
+    } d_mbr;
 
 char** str_split(char* a_str, const char a_delim)
 {
@@ -85,6 +101,30 @@ char** str_split(char* a_str, const char a_delim)
     return result;
 }
 
+void crearParticion()
+{
+    /*Validar si es primera particion*/
+    if(particionado_disco_actual == 0)
+    {
+        /*Primera particion*/
+        d_mbr.particiones = 1;
+        d_mbr.particiones_logicas = 0;
+        /*d_mbr.*/
+        /*Escribir MBR*/
+        int t_bytes = 0;
+        if(val_unit[0] == 'k')
+        {
+            t_bytes = 1024 * val_size -1;
+        }
+        else if(val_unit[0] == 'm')
+        {
+            t_bytes = 1024 * 1024 * val_size -1;
+        }
+        char str_val[10];
+        sprintf(str_val, "%d", t_bytes);
+    }
+}
+
 int tamano3(char *arreglo)
 {
     int i = 0;
@@ -131,6 +171,31 @@ char *arregloDireccion(char *comando)
     printf(respuesta);
     printf("\n&&&&&&&&&&&&&&&&&&&&");
     return respuesta;
+}
+
+void escrituraPrueba()
+{
+    FILE *fp = fopen("DISCO", "ab+");
+
+    FILE *f = fopen("DISCO", "w");
+    if (f == NULL)
+    {
+        printf("\nError");
+    }else
+    {
+        /* print some text */
+        const char *text = "0";
+        fprintf(f, text);
+        int mb = 1024 * 3;
+        int i = 0;
+        FILE *pFile2;
+        pFile2=fopen("DISCO", "a");
+        for(i = 0; i < mb; i++)
+        {
+            fprintf(pFile2, text);
+        }
+    }
+
 }
 
 char *concatenarDireccion(char **arregloDirecciones, int direcciones)
@@ -195,11 +260,11 @@ void crearDisco()
     char string[32];
     if(val_unit[0] == 'k')
     {
-        t_bytes = 1024 * val_size;
+        t_bytes = 1024 * val_size -1;
     }
     else if(val_unit[0] == 'm')
     {
-        t_bytes = 1024 * 1024 * val_size;
+        t_bytes = 1024 * 1024 * val_size -1;
     }
 
     if(stat(val_direccion, &st) == -1)
@@ -229,27 +294,60 @@ void crearDisco()
             }
             ++b;
         }
+        char cero[] = "\0";
         printf("\nCreando archivo\n");
         printf(nombre);
         printf("\n....\n");
         char *ubicacion = concatenacion(val_direccion, nombre);
-        FILE *fp = fopen(ubicacion, "w");
+        FILE *fp = fopen(ubicacion, "wb");
+        fwrite(cero , 1 , sizeof(cero) , fp );
         fseek(fp, t_bytes , SEEK_SET);
+        /*fwrite(cero , 1 , sizeof(cero) , fp );*/
         fputc('\0', fp);
         fclose(fp);
     }else
     {
+        char cero[] = "\0";
         printf("[Ya fue creada la carpeta]");
         printf("\nCreando archivo...\n");
         printf(nombre);
         printf("\n....\n");
         char *ubicacion = concatenacion(val_direccion, nombre);
-        FILE *fp = fopen(ubicacion, "w");
+        FILE *fp = fopen(ubicacion, "wb");
+        fwrite(cero , 1 , sizeof(cero) , fp );
         fseek(fp, t_bytes , SEEK_SET);
+        /*fwrite(cero , 1 , sizeof(cero) , fp );*/
         fputc('\0', fp);
         fclose(fp);
     }
 }
+
+void eliminarDisco()
+{
+    int status;
+    printf("\n¿Desea eliminar el archivo? si[s] no[n]\n");
+    char decision[10];
+    fgets(decision, sizeof(decision), stdin);
+    printf(decision);
+    char *si = "s\n";
+    if(strcmp(si, decision)==0)
+    {
+
+        status = remove(val_direccion);
+        if(status==0)
+        {
+            printf("\nArchivo eliminado correctamente\n");
+        }else
+        {
+            printf("\nError al eliminar el archivo\n");
+        }
+    }
+    else
+    {
+        printf("\nNada fue eliminado\n");
+    }
+}
+
 void minusculas(char **entrada)
 {
     printf("minusculas");
@@ -339,12 +437,12 @@ char* getTexto(char comando[])/*Enviar comando completo, devuelve valor del coma
 }
 int getValorEntero(char* comando)/*Enviar comando completo, devuelve valor del comando*/
 {
-    printf("\ngetValorEntero\n");
+    /*printf("\ngetValorEntero\n");*/
     int respuesta = 0;
     char** ArregloComando;
     ArregloComando = str_split(comando, ':');
     sscanf(*(ArregloComando +1), "%d", &respuesta);
-    printf("[%d]", respuesta);
+    /*printf("[%d]", respuesta);*/
     return respuesta;
 }
 char *getValorCadena(char *comando)/*Enviar comando completo, devuelve el valor de la cadena*/
@@ -352,11 +450,11 @@ char *getValorCadena(char *comando)/*Enviar comando completo, devuelve el valor 
     char** ArregloComando = str_split(comando, ':');
     char* valor = *(ArregloComando +1);
     int i = 0;
-    printf("lllllll[%s]",valor, "\n");
+    /*printf("lllllll[%s]",valor, "\n");*/
     int tamanio = tamano2(comando);
     for(i = 0; *(valor+i) != '\0' && *(valor+i) != NULL; i++){}
-    printf("\ntamano\n");
-    printf("[%d]\n", i);
+    /*printf("\ntamano\n");
+    printf("[%d]\n", i);*/
     char *respuesta;
     respuesta =(char*)malloc(tamanio-1);
     int d;
@@ -369,9 +467,9 @@ char *getValorCadena(char *comando)/*Enviar comando completo, devuelve el valor 
             ++count;
         }
     }
-    printf("\n*******************");
+    printf("\n***getValorCadena***\n");
     printf(respuesta);
-    printf("\n********************");
+    printf("\n********************\n");
     return respuesta;
 }
 char *getValorDisco(char *comando)/*Enviar comando completo, devuelve el valor de la cadena*/
@@ -379,11 +477,11 @@ char *getValorDisco(char *comando)/*Enviar comando completo, devuelve el valor d
     char** ArregloComando = str_split(comando, ':');
     char* valor = *(ArregloComando +1);
     int i = 0;
-    printf("lllllll[%s]",valor, "\n");
+    /*printf("lllllll[%s]",valor, "\n");*/
     int tamanio = tamano2(comando);
     for(i = 0; *(valor+i) != '\0' && *(valor+i) != NULL; i++){}
-    printf("\ntamano\n");
-    printf("[%d]\n", i);
+    /*printf("\ntamano\n");
+    printf("[%d]\n", i);*/
     char *respuesta;
     respuesta =(char*)malloc(tamanio);
     int d;
@@ -405,9 +503,9 @@ char *getValorDisco(char *comando)/*Enviar comando completo, devuelve el valor d
             ++count;
         }
     }
-    printf("\n*******************");
+    printf("\n__getValorDisco__\n");
     printf(respuesta);
-    printf("\n********************");
+    printf("\n_________________");
     return respuesta;
 }
 void automata(char** entradaTotal, char* entradaUnica, int posicion)
@@ -432,9 +530,10 @@ void automata(char** entradaTotal, char* entradaUnica, int posicion)
     char *deletee = "+delete";
     char *add = "+add";
     char *rmdisk = "rmdisk";
+
+    char *fdisk = "fdisk";
     if (posicion < tamanoArreglo)/*se realizo el split correctamente*/
     {
-
         if(strcmp(token, mkdisk)==0)
         {
             bool_mkdisk = 1;
@@ -453,7 +552,7 @@ void automata(char** entradaTotal, char* entradaUnica, int posicion)
             char* unidad = getTexto(*(entradaTotal + posicion));
             val_unit[0] = unidad[0];
             printf("%c\n", val_unit[0]);
-            printf("\nEstado = 3\n");
+            /*printf("\nEstado = 3\n");*/
             automata(entradaTotal,*(entradaTotal + posicion+1), posicion+1);
         }
         else if(strcmp(token, path)==0)
@@ -465,17 +564,33 @@ void automata(char** entradaTotal, char* entradaUnica, int posicion)
         else if(strcmp(token, type)==0)
         {
             bool_type = 1;
+            printf(entradaUnica);
+            val_type[0] = *(entradaUnica + 6);
+
             automata(entradaTotal,*(entradaTotal + posicion+1), posicion+1);
         }
         else if(strcmp(token, name)==0)
         {
             bool_name = 1;
             nombre = getValorDisco(*(entradaTotal + posicion));
+            nombre_fdisk = getValorCadena(*(entradaTotal + posicion));
+            printf("\n----");printf(nombre_fdisk);
             automata(entradaTotal,*(entradaTotal + posicion+1), posicion+1);
         }
         else if(strcmp(token, fit)==0)
         {
             bool_fit = 1;
+            printf("%c", *(entradaUnica + 5));
+            if(*(entradaUnica + 5) == 'b')
+            {
+                val_fit = 1;
+            }else if(*(entradaUnica + 5) == 'f')
+            {
+                val_fit = 2;
+            }else if(*(entradaUnica + 5) == 'w')
+            {
+                val_fit = 2;
+            }
             automata(entradaTotal,*(entradaTotal + posicion+1), posicion+1);
         }
         else if(strcmp(token, deletee)==0)
@@ -486,6 +601,17 @@ void automata(char** entradaTotal, char* entradaUnica, int posicion)
         else if(strcmp(token, add)==0)
         {
             bool_add = 1;
+            val_add = getValorEntero(*(entradaTotal + posicion));
+            automata(entradaTotal,*(entradaTotal + posicion+1), posicion+1);
+        }
+        else if(strcmp(token, rmdisk)==0)
+        {
+            bool_rmdisk = 1;
+            automata(entradaTotal,*(entradaTotal + posicion+1), posicion+1);
+        }
+        else if(strcmp(token, fdisk)==0)
+        {
+            bool_fdisk = 1;
             automata(entradaTotal,*(entradaTotal + posicion+1), posicion+1);
         }
 
@@ -512,6 +638,15 @@ void master_Driver()
         else
         {
             printf("Error, comando no reconocido.");
+        }
+    }else if(bool_rmdisk == 1)
+    {
+        eliminarDisco();
+    }else if(bool_fdisk == 1)
+    {
+        if(bool_sizee==1 && bool_unit==1 && bool_path==1 && bool_name==1)
+        {
+            crearParticion();
         }
     }
 }
@@ -568,9 +703,9 @@ int main()
         /*Iniciando el pseudoautomata y el analisis realizado por el mismo*/
         /*******************************/
         char** tokens;
-        printf("Se ingresó:[%s]\n\n", entrada);
+        /*printf("Se ingresó:[%s]\n\n", entrada);*/
         tokens = str_split(entrada, ' ');
-        printf("Despues:[%s]\n\n", entrada);
+        /*printf("Despues:[%s]\n\n", entrada);*/
         tamanoArreglo = tamano(tokens);
         printf("\nIniciando el automata...\n");
         automata(tokens, *(tokens + 0), 0);
