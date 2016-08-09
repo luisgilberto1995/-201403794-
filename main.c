@@ -5,13 +5,18 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <inttypes.h>
+#include <time.h>
 
     int estado;
     int tamanoArreglo;
     char** arreglo;
     int particionado_disco_actual = 0;
-    int val_fit = 3;/*BF 1, FF 2, WF 3*/
+    char val_fit;/*BF 1, FF 2, WF 3*/
     int val_add = 0;
+    char *pathDisco;
+    int load_disk_flag = 0;
+    int bytesize_mbr = 0;
     /**/
     /*----------------------------*/
     /*Banderas reservadas*/
@@ -37,20 +42,29 @@
     char* val_direccion;
     char* nombre;
     char* nombre_fdisk;
-    char val_type[1];
+    char val_type[1] = "p";
     /*----------------------------*/
     /*Valores reservados*/
     /*----------------------------*/
-
-    struct discoMBR
+    typedef struct particion
     {
-        int tamanoDisco;/*En KB*/
-        int particiones;
-        int particiones_logicas;
-        int tipo[3];/*[1 primaria][2 extendida][3 logica]*/
-        char* nombreParticiones;
+        char part_status;/*1 activa 0 no*/
+        char part_type;/*1 primaria 0 extendida*/
+        char part_fit;/*primer mejor peor*/
+        int part_start;
+        int part_size;
+        char part_name[16];
+    }particion;
 
-    } d_mbr;
+    typedef struct mbr_DISCO
+    {
+        int mbr_tamano;/*En KB*/
+        time_t mbr_fecha_creacion;
+        int mbr_disk_signature;/*numero random*/
+        particion mbr_partition[4];
+    }mbr_DISCO, *D_actual;
+
+    struct mbr_DISCO *mbr_p=NULL;
 
 char** str_split(char* a_str, const char a_delim)
 {
@@ -101,16 +115,132 @@ char** str_split(char* a_str, const char a_delim)
     return result;
 }
 
+off_t filesize(const char *filename){
+    struct stat st;
+    if( stat(filename, &st) == 0)
+        return st.st_size;
+    return -1;
+}
+
+int getPrimarias()
+{
+    int primarias = 0;
+    int i;
+    for(i = 0; i< 4; i++)
+    {
+        if(mbr_p->mbr_partition[i].part_status == '1')
+        {
+            if(mbr_p->mbr_partition[i].part_type == 'p')
+            {
+                primarias = primarias + 1;
+            }
+        }
+    }
+    return primarias;
+}
+
+int getExtendidas()
+{
+    int extendidas = 0;
+    int i;
+    for(i = 0; i< 4; i++)
+    {
+        if(mbr_p->mbr_partition[i].part_status == '1')
+        {
+            if(mbr_p->mbr_partition[i].part_type == 'e')
+            {
+                extendidas = extendidas + 1;
+            }
+        }
+    }
+    return extendidas;
+}
+
+int cargarArchivoDisco()
+{
+    printf("\ncargarArchivoDisco\n");
+
+    mbr_DISCO *primerDisco = malloc(sizeof(mbr_DISCO));
+    FILE * file = fopen(val_direccion, "rb");
+    if(file != NULL)
+    {
+        fread(primerDisco, sizeof(struct mbr_DISCO), 1, file);
+        fclose(file);
+        mbr_p = primerDisco;
+        printf("\Disco [%d] cargado.", mbr_p->mbr_disk_signature);
+        load_disk_flag = 1;
+    }else
+    {
+        load_disk_flag = 0;
+        printf("ERROR: No se encontró el disco");
+    }
+    /*primerDisco->mbr_tamano = 10 * 1024 * 1024;
+    primerDisco->mbr_partition[0].part_status = 1;
+    primerDisco->mbr_partition[0].part_status = 1;
+    FILE * file= fopen("disc.dsk", "wb");
+    if (file != NULL) {
+        fwrite(primerDisco, sizeof(struct mbr_DISCO), 1, file);
+        fclose(file);
+    }
+
+    mbr_DISCO *primerDiscoleido = malloc(sizeof(struct mbr_DISCO));
+    FILE * file2= fopen("disco.dsk", "rb");
+    if (file2 != NULL) {
+        fread(primerDiscoleido, sizeof(struct mbr_DISCO), 1, file2);
+        fclose(file2);
+    }
+
+    printf("\n*[%d]\n", primerDisco->mbr_disk_signature);
+    /*int tamanoArchivo = filesize(val_direccion)-512;
+    d_mbr.tamanoDisco = tamanoArchivo;
+    if(tamanoArchivo == -513)
+    {
+        printf("Error, no se encontró el disco");
+    }else
+    {
+        FILE *myfile;
+        int i;
+        unsigned char inicio[1];
+        myfile = fopen(val_direccion, "r");
+        for(i = 0; i < 1; i++){
+            fread(&inicio[i], 1, 1, myfile);
+        }
+        printf("char[%c]", inicio[0]);
+        if(inicio[0]=='\0')
+        {
+            printf("Disco vacío!\n");
+
+        }else{
+            printf("Disco lleno!\n");
+            int paso2 = 0;
+            if(val_type[0] == 'p')
+            {
+                t_bytes = 1024 * val_size -1;
+            }
+            else if(val_type[0] == 'e')
+            {
+                t_bytes = 1024 * 1024 * val_size -1;
+            }
+            else if(val_type[0] == 'l')
+            {
+                t_bytes = 1024 * 1024 * val_size -1;
+            }
+        }
+    }*/
+}
 void crearParticion()
 {
-    /*Validar si es primera particion*/
-    if(particionado_disco_actual == 0)
+    /*leer disco*/
+    cargarArchivoDisco();
+    /*Carga exitosa del disco = 1, si no = 0*/
+    if(load_disk_flag == 1)
     {
         /*Primera particion*/
-        d_mbr.particiones = 1;
-        d_mbr.particiones_logicas = 0;
+        /*d_mbr.particiones = 1;
+        d_mbr.particiones_logicas = 0;*/
         /*d_mbr.*/
         /*Escribir MBR*/
+        int min_byte = 1024 * 1024 * 2;
         int t_bytes = 0;
         if(val_unit[0] == 'k')
         {
@@ -120,9 +250,84 @@ void crearParticion()
         {
             t_bytes = 1024 * 1024 * val_size -1;
         }
+        /*Convertir int a char*/
         char str_val[10];
         sprintf(str_val, "%d", t_bytes);
+        /*--------------------------------*/
+        if(t_bytes >= min_byte)
+        {
+            int primarias=0;
+            int extendidas=0;
+            primarias = getPrimarias();
+            extendidas = getExtendidas();
+            if(val_type[0] == 'p')
+            {
+                printf("\nParticion primaria seleccionada...\n");
+                if(extendidas+primarias <4)
+                {
+                    if(primarias == 0 && extendidas == 0)
+                    {
+                        /*Es la primera*/
+                        if(val_size <= mbr_p->mbr_tamano)
+                        {
+                            int namesize = tamano3(nombre_fdisk);
+                            if(namesize <= 16)
+                            {
+
+                                mbr_p->mbr_partition[0].part_status = '1';
+                                int c;
+                                for(c = 0; c < namesize; c++)
+                                {
+                                    mbr_p->mbr_partition[0].part_name[c] = *(nombre_fdisk + c);
+                                }
+                                mbr_p->mbr_partition[0].part_type = 'p';
+                                mbr_p->mbr_partition[0].part_fit = val_fit;
+                                mbr_p->mbr_partition[0].part_start = 0;
+                                mbr_p->mbr_partition[0].part_size = val_size;
+                            }
+                            else
+                            {
+                                printf("ERROR: nombre de particion muy amplio");
+                            }
+
+                        }else
+                        {
+                            printf("ERROR: Excede la capacidad del disco");
+                        }
+                    }
+                }
+                else
+                {
+                    printf("ERROR: particion primaria");
+                }
+            }else if(val_type[0] == 'e')
+            {
+                printf("\nParticion extendida seleccionada...\n");
+                if(extendidas == 0)
+                {
+
+                }else
+                {
+                    printf("ERROR: particion extendida");
+                }
+            }else if(val_type[0] == 'l')
+            {
+                printf("\nParticion logica seleccionada...\n");
+                if(extendidas == 1)
+                {
+
+                }else
+                {
+                    printf("ERROR: particion logica");
+                }
+            }
+        }
+        else
+        {
+            printf("ERROR: el tamano minimo de particionado es de 2MB");
+        }
     }
+
 }
 
 int tamano3(char *arreglo)
@@ -186,7 +391,7 @@ void escrituraPrueba()
         /* print some text */
         const char *text = "0";
         fprintf(f, text);
-        int mb = 1024 * 3;
+        int mb = 1024 * 50 * 1024;
         int i = 0;
         FILE *pFile2;
         pFile2=fopen("DISCO", "a");
@@ -246,9 +451,9 @@ char *concatenacion(char *parametro1, char *parametro2)
     respuesta = malloc(char_tamano1 + char_tamano2 - 1);
     strcpy(respuesta, parametro1);
     strcat(respuesta, parametro2);
-    printf("\nccccccccccccccccccc1\n");
+    /*printf("\nccccccccccccccccccc1\n");
     printf(respuesta);
-    printf("\n-");
+    printf("\n-");*/
     return respuesta;
 }
 
@@ -294,31 +499,98 @@ void crearDisco()
             }
             ++b;
         }
-        char cero[] = "\0";
-        printf("\nCreando archivo\n");
+        printf("\nCreando archivo con carpeta recien creada...\n");
         printf(nombre);
         printf("\n....\n");
+        char cero[1];
+        cero[0] = '\0';
         char *ubicacion = concatenacion(val_direccion, nombre);
         FILE *fp = fopen(ubicacion, "wb");
-        fwrite(cero , 1 , sizeof(cero) , fp );
-        fseek(fp, t_bytes , SEEK_SET);
         /*fwrite(cero , 1 , sizeof(cero) , fp );*/
-        fputc('\0', fp);
+        /*fseek(fp, t_bytes , SEEK_SET);*/
+        /*fwrite(cero , 1 , sizeof(cero) , fp );*/
+        int i;
+        for(i=0; i< t_bytes; i++)
+        {
+            fputc('\0', fp);
+        }
         fclose(fp);
+        /*DECLARAR MBR*/
+        mbr_DISCO *primerDisco = malloc(sizeof(mbr_DISCO));
+        /*----------------------------------------*/
+        /*FECHA*/
+        time_t t = time(NULL);
+        struct tm *tm = localtime(&t);
+        primerDisco->mbr_fecha_creacion = t;
+        /*strftime(primerDisco->mbr_fecha_creacion, sizeof(primerDisco->mbr_fecha_creacion), "%c", tm);*/
+        /*----------------------------------------*/
+        /*IDENTIFICADOR UNICO*/
+        int signature = rand();
+        primerDisco->mbr_disk_signature = signature;
+        /*----------------------------------------*/
+        /*TAMANO*/
+        primerDisco->mbr_tamano = t_bytes;
+        /*----------------------------------------*/
+        for(i = 0; i<4; i++)
+        {
+            primerDisco->mbr_partition[i].part_status = '0';
+        }
+        FILE *file = fopen(ubicacion, "rb+");
+        size_t tam = sizeof(struct mbr_DISCO);
+        printf("\nVALOR EN BYTES[%zu]\n", tam);
+        if(file != NULL)
+        {
+            fwrite(primerDisco, sizeof(struct mbr_DISCO), 1, file);
+            fclose(file);
+        }
     }else
     {
-        char cero[] = "\0";
         printf("[Ya fue creada la carpeta]");
         printf("\nCreando archivo...\n");
         printf(nombre);
         printf("\n....\n");
+        char cero[1];
+        cero[0] = '\0';
         char *ubicacion = concatenacion(val_direccion, nombre);
         FILE *fp = fopen(ubicacion, "wb");
-        fwrite(cero , 1 , sizeof(cero) , fp );
-        fseek(fp, t_bytes , SEEK_SET);
+        int i;
+        for(i=0; i< t_bytes; i++)
+        {
+            fputc('\0', fp);
+        }
         /*fwrite(cero , 1 , sizeof(cero) , fp );*/
-        fputc('\0', fp);
+        /*fseek(fp, t_bytes , SEEK_SET);*/
+        /*fwrite(cero , 1 , sizeof(cero) , fp );*/
+        /*fputc('\0', fp);*/
         fclose(fp);
+        /*DECLARAR MBR*/
+        mbr_DISCO *primerDisco = malloc(sizeof(mbr_DISCO));
+        /*----------------------------------------*/
+        /*FECHA*/
+        time_t t = time(NULL);
+        struct tm *tm = localtime(&t);
+        primerDisco->mbr_fecha_creacion = t;
+        /*strftime(primerDisco->mbr_fecha_creacion, sizeof(primerDisco->mbr_fecha_creacion), "%c", tm);*/
+        /*----------------------------------------*/
+        /*IDENTIFICADOR UNICO*/
+        int signature = rand();
+        primerDisco->mbr_disk_signature = signature;
+        /*----------------------------------------*/
+        /*TAMANO*/
+        primerDisco->mbr_tamano = t_bytes;
+        /*----------------------------------------*/
+        for(i = 0; i<4; i++)
+        {
+            primerDisco->mbr_partition[i].part_status = '0';
+        }
+        FILE *file = fopen(ubicacion, "rb+");
+        size_t tam = sizeof(struct mbr_DISCO);
+        printf("\nVALOR EN BYTES[%zu]\n", tam);
+        if(file != NULL)
+        {
+            fwrite(primerDisco, sizeof(struct mbr_DISCO), 1, file);
+            fclose(file);
+        }
     }
 }
 
@@ -574,7 +846,7 @@ void automata(char** entradaTotal, char* entradaUnica, int posicion)
             bool_name = 1;
             nombre = getValorDisco(*(entradaTotal + posicion));
             nombre_fdisk = getValorCadena(*(entradaTotal + posicion));
-            printf("\n----");printf(nombre_fdisk);
+            printf("\n----\n");printf(nombre_fdisk);
             automata(entradaTotal,*(entradaTotal + posicion+1), posicion+1);
         }
         else if(strcmp(token, fit)==0)
@@ -583,13 +855,13 @@ void automata(char** entradaTotal, char* entradaUnica, int posicion)
             printf("%c", *(entradaUnica + 5));
             if(*(entradaUnica + 5) == 'b')
             {
-                val_fit = 1;
+                val_fit = 'b';
             }else if(*(entradaUnica + 5) == 'f')
             {
-                val_fit = 2;
+                val_fit = 'f';
             }else if(*(entradaUnica + 5) == 'w')
             {
-                val_fit = 2;
+                val_fit = 'w';
             }
             automata(entradaTotal,*(entradaTotal + posicion+1), posicion+1);
         }
@@ -647,12 +919,17 @@ void master_Driver()
         if(bool_sizee==1 && bool_unit==1 && bool_path==1 && bool_name==1)
         {
             crearParticion();
+        }else
+        {
+            printf("Error, comando no reconocido.");
         }
     }
 }
 
 int main()
 {
+
+    srand(time(NULL));
     estado = 0;
     /*tamanoArreglo = 0;
     int y = 5;

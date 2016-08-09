@@ -1,5 +1,5 @@
 # depslib dependency file v1.0
-1470582644 source:/home/luis/Documentos/CodeBlocks Projects/fase1/main.c
+1470714266 source:/home/luis/Documentos/CodeBlocks Projects/fase1/main.c
 	<stdio.h>
 	<stdlib.h>
 	<string.h>
@@ -7,4 +7,6 @@
 	<sys/types.h>
 	<sys/stat.h>
 	<unistd.h>
+	<inttypes.h>
+	<time.h>
 
