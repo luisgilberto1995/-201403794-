@@ -6,8 +6,6 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <inttypes.h>
-#include <time.h>
-
     int estado;
     int tamanoArreglo;
     char** arreglo;
@@ -16,7 +14,18 @@
     int val_add = 0;
     char *pathDisco;
     int load_disk_flag = 0;
-    int bytesize_mbr = 0;
+    int bytesize_mbr = 136;
+    int num_particiones = 0;
+    /****************************/
+    int minimos1[4];
+    int superior[4];
+    /****************************/
+    int LimSuperior[4];
+    int LimInferior[4];
+    /****************************/
+    int EspacioLibre[5];
+    int EspacioLibre_min[5];
+    int EspacioLibre_max[5];
     /**/
     /*----------------------------*/
     /*Banderas reservadas*/
@@ -64,7 +73,17 @@
         particion mbr_partition[4];
     }mbr_DISCO, *D_actual;
 
-    struct mbr_DISCO *mbr_p=NULL;
+ struct ebr_extended
+{
+    char part_status;
+    char part_fit;
+    int part_start;
+    int part_size;
+    int part_next;
+    char part_name[16];
+}ebr;
+    struct mbr_DISCO *mbr_p = NULL;
+    struct ebr_extended *ebr_p = NULL;
 
 char** str_split(char* a_str, const char a_delim)
 {
@@ -122,6 +141,40 @@ off_t filesize(const char *filename){
     return -1;
 }
 
+void reporteLogicas()
+{
+    if (getExtendidas() == 1)
+    {
+        int i;
+        int start;
+        for(i = 0; i<4; i++)
+        {
+            if(mbr_p->mbr_partition[i].part_type == 'e')
+            {
+                start = 140 + mbr_p->mbr_partition[i].part_start;
+            }
+        }
+        printf("\nREPORTE-------------------------\nstart:%d\n", start);
+        struct ebr_extended *ebr_actual=malloc(sizeof(struct ebr_extended));
+        int status = 0;
+        int c = 0;
+        while(status != -1)
+        {
+            FILE * file= fopen(val_direccion, "rb");
+            if (file != NULL)
+            {
+                fseek(file, ebr_actual->part_next+140 ,SEEK_SET);
+                fread(ebr_actual, sizeof(struct ebr_extended), 1, file);
+                fclose(file);
+            }
+            status = ebr_actual->part_next;
+            printf("\n[DATO]start: %d tamano: %d next:%d", ebr_actual->part_start, ebr_actual->part_size, status);
+            c++;
+            if(c == 25){break;}
+        }
+    }
+}
+
 int getPrimarias()
 {
     int primarias = 0;
@@ -154,6 +207,498 @@ int getExtendidas()
         }
     }
     return extendidas;
+}
+
+int getParticiones()
+{
+    int contador = 0;
+    int i;
+    for(i = 0; i<4; i++)
+    {
+        if(mbr_p->mbr_partition[i].part_status == '1')
+        {
+            ++contador;
+        }
+    }
+    return contador;
+}
+
+void Particionar(int valor_size)
+{
+    /*------------------PARTICION PRIMARIA---------------------*/
+    int i;
+    int s_flag = 0;
+    int created = 0;
+    for(i = 0; i< 5; i++)
+    {
+        if(valor_size <= EspacioLibre[i])
+        {
+            int a;
+            for(a = 0; a<4; a++)
+            {
+                if(mbr_p->mbr_partition[a].part_status == '0' && created == 0)
+                {
+                    int namesize = tamano3(nombre_fdisk);
+                    if(namesize <= 16)
+                    {
+                        int c;
+                        for(c = 0; c < namesize; c++)
+                        {
+                            mbr_p->mbr_partition[a].part_name[c] = *(nombre_fdisk + c);
+                        }
+                        mbr_p->mbr_partition[a].part_status = '1';
+                        mbr_p->mbr_partition[a].part_type = 'p';
+                        mbr_p->mbr_partition[a].part_size = valor_size;
+                        mbr_p->mbr_partition[a].part_start = EspacioLibre_min[i];
+                        printf("\nEsta particion inicia en: %d", EspacioLibre_min[i]);
+                        printf("\nTamano de la particion: %d", valor_size);
+                        FILE *file = fopen(val_direccion, "rb+");
+                        size_t tam = sizeof(struct mbr_DISCO);
+                        printf("\nVALOR EN BYTES[%zu]\n", tam);
+                        if(file != NULL)
+                        {
+                            fwrite(mbr_p, sizeof(struct mbr_DISCO), 1, file);
+                            fclose(file);
+                            printf("\nParticion primaria realizada.\n");
+                            s_flag = 1;
+                        }
+                        created = 1;
+                    }else{ printf("ERROR: nombre muy extenso para la particion.");}
+                }
+            }
+        }
+    }
+    if(s_flag == 0)
+    {
+        printf("\n:(\n");
+    }
+    /*---------------------------------------------------------------------------*/
+}
+
+void particionLogica(int t_bytes)
+{
+    int i;
+    int pos = 0;
+    int confirmacion = 0;
+    for(i = 0; i < 4; i++)
+    {
+        if(mbr_p->mbr_partition[i].part_type == 'e')
+        {
+            pos = i;
+            break;
+        }
+    }
+    /*******************LECTURA Y RECOLECCION DE DATOS DE INTERES******************/
+    int default_size = mbr_p->mbr_partition[pos].part_size;
+    int start = mbr_p->mbr_partition[pos].part_start ;
+    printf("\nParticion extendida, fisicamente inicia en: %d de tamano: %d", start+140, default_size);
+    struct ebr_extended *ebr_actual=malloc(sizeof(struct ebr_extended));
+    FILE * file= fopen(val_direccion, "rb");
+    if (file != NULL) {
+        fseek(file, start+140 ,SEEK_SET);
+        fread(ebr_actual, sizeof(struct ebr_extended), 1, file);
+        fclose(file);
+    }
+    /******************************************************************************/
+    printf("\n//%c, %d\n", ebr_actual->part_status, ebr_actual->part_next);
+    if(ebr_actual->part_status == '0'&& ebr_actual->part_next == -1)
+    {
+        /*Es la primera lógica*/
+        printf("\nprimera particion logica\n");
+        if(t_bytes <= default_size)
+        {
+            int namesize = tamano3(nombre_fdisk);
+            if(namesize <= 16)
+            {
+                int c;
+                for(c = 0; c < namesize; c++)
+                {
+                    ebr_actual->part_name[c] = *(nombre_fdisk + c);
+                }
+                ebr_actual->part_start = start;
+                ebr_actual->part_fit = val_fit;
+                ebr_actual->part_status = '1';
+                ebr_actual->part_size = t_bytes;
+                ebr_actual->part_next = -1;
+
+                /**/
+                printf("\nActualizando fisicamente EBR en: %d", start+140);
+                /**/
+                FILE * file_update = fopen(val_direccion, "rb+");
+                if (file_update != NULL) {
+                    fseek(file_update, start+140 ,SEEK_SET);
+                    fwrite(ebr_actual, sizeof(struct ebr_extended), 1, file_update);
+                    fclose(file_update);
+                }
+            }else
+            {
+                printf("\nERROR:El nombre excede el limite\n");
+            }
+        }else
+        {
+            printf("\nError: no hay espacio disponible :(\n");
+        }
+
+    }else
+    {
+        int confirmacion2 = 0;
+        if(ebr_actual->part_status == '0'&& ebr_actual->part_next != -1)
+        {
+            printf("\nPrimer EBR vacio, pero existen mas particiones logicas");
+            if(t_bytes <= (ebr_actual->part_start - start))
+            {
+                confirmacion2 = 1;
+                printf("\nSi cabe en el primer EBR");
+                int namesize = tamano3(nombre_fdisk);
+                if(namesize <= 16)
+                {
+
+                    int c;
+                    for(c = 0; c < namesize; c++)
+                    {
+                        ebr_actual->part_name[c] = *(nombre_fdisk + c);
+                    }
+                    ebr_actual->part_fit = val_fit;
+                    /*ebr_actual->part_next = ebr_actual->part_next;*/
+                    ebr_actual->part_size = t_bytes;
+                    ebr_actual->part_start = start;
+                    ebr_actual->part_status ='1';
+                    /**/
+                    printf("\nActualizando fisicamente EBR en: %d", start+140);
+                    /**/
+                    FILE * file_update = fopen(val_direccion, "rb+");
+                    if (file_update != NULL) {
+                        fseek(file_update, start+140 ,SEEK_SET);
+                        fwrite(ebr_actual, sizeof(struct ebr_extended), 1, file_update);
+                        fclose(file_update);
+                        confirmacion = 1;
+                    }
+
+                }else
+                {
+                    printf("\nERROR:El nombre excede el limite.");
+                }
+            }
+        }
+        printf("\nConfirmacion %d ... NEXT: %d", confirmacion2, ebr_actual->part_next);
+        if(confirmacion2 == 0)
+        {
+            while(confirmacion2 == 0)
+            {
+                if(ebr_actual->part_next == -1)
+                {
+                    confirmacion2 = 1;
+                    printf("\nEs el ultimo EBR.");
+                    printf("\nParticion:%d Espacio %d", t_bytes, ((default_size) - (start + ebr_actual->part_size)));
+                    if(t_bytes <= ((default_size) - (start + ebr_actual->part_size)))
+                    {
+                        int namesize = tamano3(nombre_fdisk);
+                        if(namesize <= 16)
+                        {
+                            struct ebr_extended *ebr_nuevo=malloc(sizeof(struct ebr_extended));
+                            int c;
+                            for(c = 0; c < namesize; c++)
+                            {
+                                ebr_nuevo->part_name[c] = *(nombre_fdisk + c);
+                            }
+                            ebr_nuevo->part_fit = val_fit;
+                            ebr_nuevo->part_next = -1;
+                            ebr_nuevo->part_size = t_bytes;
+                            ebr_nuevo->part_start = ebr_actual->part_start + ebr_actual->part_size;
+                            ebr_nuevo->part_status = '1';
+                            ebr_actual->part_next = ebr_nuevo->part_start;
+
+                            start = ebr_nuevo->part_start;
+                            printf("\nActualizando EBR en:%d su nuevo part_start: %d" , ebr_actual->part_start+140, ebr_actual->part_next);
+                            FILE * file_update= fopen(val_direccion, "rb+");
+                            if (file_update != NULL) {
+                                fseek(file_update, ebr_actual->part_start+140 ,SEEK_SET);
+                                fwrite(ebr_actual, sizeof(struct ebr_extended), 1, file_update);
+                                fclose(file_update);
+                                printf("\n???");
+                            }
+                            printf("\nEscribiendo fisicamente ultimo EBR en:%d", start+140);
+                            FILE * file= fopen(val_direccion, "rb+");
+                            if (file != NULL) {
+                                fseek(file, start+140 ,SEEK_SET);
+                                fwrite(ebr_nuevo, sizeof(struct ebr_extended), 1, file);
+                                fclose(file);
+                                confirmacion = 1;
+                            }
+                        }else
+                        {
+                            printf("\nERROR:El nombre excede el limite.");
+                        }
+                    }
+                }else
+                {
+                    printf("\nebr_actual->part_next:%d", ebr_actual->part_next);
+                    printf("\nebr_actual->part_start:%d", ebr_actual->part_start);
+                    printf("\nebr_actual->part_size:%d", ebr_actual->part_size);
+                    int operacion = 0;
+                    operacion = ebr_actual->part_next - (ebr_actual->part_start + ebr_actual->part_size);
+                    printf("\nt1:%d", t_bytes);
+                    /*printf("\noperacion:%d", operacion);*/
+                    printf("\nt2");
+                    if(t_bytes <= operacion)
+                    {
+                        printf("\nt");
+                        confirmacion2 = 1;
+                        printf("\nt");
+                        int namesize = tamano3(nombre_fdisk);
+                        printf("\nt");
+                        if(namesize <= 16)
+                        {
+                            struct ebr_extended *ebr_nuevo=malloc(sizeof(struct ebr_extended));
+                            int c;
+                            for(c = 0; c < namesize; c++)
+                            {
+                                ebr_nuevo->part_name[c] = *(nombre_fdisk + c);
+                            }
+                            ebr_nuevo->part_fit = val_fit;
+                            ebr_nuevo->part_next = ebr_actual->part_next;
+                            ebr_nuevo->part_size = t_bytes;
+                            ebr_nuevo->part_start = ebr_actual->part_start + ebr_actual->part_size;
+                            ebr_nuevo->part_status = '1';
+                            ebr_actual->part_next = ebr_nuevo->part_start;
+                            start = ebr_nuevo->part_start;
+                            printf("\nEscribiendo en medio EBR en:%d", start);
+
+                            FILE * file_update= fopen(val_direccion, "rb+");
+                            if (file_update != NULL) {
+                                fseek(file_update, ebr_actual->part_start+140 ,SEEK_SET);
+                                fwrite(ebr_actual, sizeof(struct ebr_extended), 1, file_update);
+                                fclose(file_update);
+                            }
+                            FILE * file= fopen(val_direccion, "rb+");
+                            if (file != NULL) {
+                                fseek(file, start +140,SEEK_SET);
+                                fwrite(ebr_nuevo, sizeof(struct ebr_extended), 1, file);
+                                fclose(file);
+                                confirmacion = 1;
+                            }
+                        }else
+                        {
+                            printf("\nERROR:El nombre excede el limite.");
+                        }
+                    }
+                }
+                if(confirmacion2 == 0)
+                {
+                    if(ebr_actual->part_next != -1)
+                    {
+                        FILE * file5= fopen(val_direccion, "rb");
+                        if (file5 != NULL) {
+                            fseek(file5, ebr_actual->part_next+140 ,SEEK_SET);
+                            fread(ebr_actual, sizeof(struct ebr_extended), 1, file5);
+                            fclose(file5);
+                        }
+                    }else
+                    {
+                        confirmacion2 = 1;
+                    }
+                }
+            }
+        }
+    }
+    if(confirmacion == 1)
+    {
+        printf("\nParticion logica creada correctamente\n");
+    }
+}
+
+void setMinimos()
+{
+    int i;
+    int contador = 0;
+    for(i = 0; i<4; i++)
+    {
+        /*ordenar estos datos de menor a mayor*/
+        minimos1[i] = 0;
+        superior[i] = 0;
+        /*-------------------------------------*/
+        /*aqui van ordenadas las respuestas*/
+        LimInferior[i] = 0;
+        LimSuperior[i] = 0;
+        /*--------------------------------------*/
+        EspacioLibre[i] = 0;
+        EspacioLibre_min[i] = 0;
+        EspacioLibre_max[i] = 0;
+    }
+    EspacioLibre[4] = 0;
+    EspacioLibre_min[4] = 0;
+    EspacioLibre_max[4] = 0;
+    for(i = 0; i < 4; i++)
+    {
+        if(mbr_p->mbr_partition[i].part_status == '1')
+        {
+            minimos1[contador] = mbr_p->mbr_partition[i].part_start;
+            superior[contador] = mbr_p->mbr_partition[i].part_start + mbr_p->mbr_partition[i].part_size;
+            printf("\nHay una particion que inicia en: %d y de tamano: %d\n", mbr_p->mbr_partition[i].part_start, mbr_p->mbr_partition[i].part_size);
+            ++contador;
+        }
+    }
+    int count = 0;
+    int count2 = 0;
+    int flag = 0;
+    int pos = 0;
+    int minimo_cero = 0;
+    printf("\nParticiones encontradas:%d", contador);
+    /******************************************************************/
+    int mini = minimos1[0];
+    int max = superior[0];
+    if(mini == 0)
+    {
+        LimInferior[count2] = mini;
+        LimSuperior[count2] = max;
+        ++count2;
+        ++count;
+    }
+    for(; count < contador; count++)
+    {
+        int y;
+        /*Asignando a mini un valor diferente de 0, puesto que si existía 0 ya fue agregado*/
+        for(y = 0; y< 4; y++)
+        {
+            if(minimos1[y] != 0)
+            {
+                mini = minimos1[y];
+                max = superior[y];
+                pos = y;
+                break;
+            }
+        }
+
+        printf("\nMINI:%d MAX%d\n", mini, max);
+        /*buscando el verdadero minimo*/
+        for(y = 0; y<4; y++)
+        {
+            if(minimos1[y] < mini && minimos1[y] != 0)
+            {
+                mini = minimos1[y];
+                max = superior[y];
+                flag = 1;
+                pos = y;
+                printf("\nfor1 %d < %d - %d != 0\n", minimos1[y], mini, minimos1[y]);
+            }
+        }
+        /*if(flag ==1)
+        {*/
+            LimInferior[count2] = mini;
+            LimSuperior[count2] = max;
+            minimos1[pos] = 0;
+            flag = 0;
+            printf("\nEstableciendo Minimo:[%d] y maximo [%d]", mini, max);
+       /* }*//*else if(mini == 0)
+        {
+            LimInferior[count2] = mini;
+            LimSuperior[count2] = max;
+            minimos1[0] = 0;
+        }*/
+        ++count2;
+    }
+    int y;
+    /*.................................................................*/
+    for(y = 0; y<4; y++)
+    {
+        printf("\nRESULTADO-Minimo[%d]-Maximo[%d]", LimInferior[y], LimSuperior[y]);
+    }
+    /*.................................................................*/
+    /******************************************************************/
+    num_particiones = contador;
+    printf("\nExisten [%d] minimos", contador);
+    for(y = 0; y< contador; y++)
+    {
+        if(y == 0)
+        {
+            int libre = LimInferior[y];
+            EspacioLibre[y] = libre;
+            EspacioLibre_min[y] = 0;
+            EspacioLibre_max[y] = LimInferior[y];
+        }else
+        {
+            int libre = LimInferior[y] - LimSuperior[y-1];
+            EspacioLibre[y] = libre;
+            EspacioLibre_min[y] = LimSuperior[y-1];
+            EspacioLibre_max[y] = LimInferior[y];
+        }
+    }
+    EspacioLibre[contador] = mbr_p->mbr_tamano - LimSuperior[contador-1];
+    EspacioLibre_min[contador] = LimSuperior[contador-1];
+    EspacioLibre_max[contador] = mbr_p->mbr_tamano;
+    printf("\ntamano del disco:%d", mbr_p->mbr_tamano);
+}
+
+void particionExendida(int valor_size)
+{
+    setMinimos();
+    /*------------------PARTICION EXTENDIDA---------------------*/
+    int i;
+    int s_flag = 0;
+    int created = 0;
+    for(i = 0; i< 5; i++)
+    {
+        if(valor_size <= EspacioLibre[i])
+        {
+            int a;
+            for(a = 0; a<4; a++)
+            {
+                if(mbr_p->mbr_partition[a].part_status == '0' && created == 0)
+                {
+                    int namesize = tamano3(nombre_fdisk);
+                    if(namesize <= 16)
+                    {
+                        int c;
+                        for(c = 0; c < namesize; c++)
+                        {
+                            mbr_p->mbr_partition[a].part_name[c] = *(nombre_fdisk + c);
+                        }
+                        mbr_p->mbr_partition[a].part_status = '1';
+                        mbr_p->mbr_partition[a].part_type = 'e';
+                        mbr_p->mbr_partition[a].part_size = valor_size;
+                        mbr_p->mbr_partition[a].part_start = EspacioLibre_min[i];
+                        printf("\nEsta particion inicia en: %d", EspacioLibre_min[i]);
+                        printf("\nTamano de la particion: %d", valor_size);
+                        FILE *file = fopen(val_direccion, "rb+");
+                        size_t tam = sizeof(struct mbr_DISCO);
+                        printf("\nVALOR EN BYTES[%zu]\n", tam);
+                        if(file != NULL)
+                        {
+                            fwrite(mbr_p, sizeof(struct mbr_DISCO), 1, file);
+                            fclose(file);
+                            printf("\nParticion primaria actualizada[extendida].\n");
+                            s_flag = 1;
+                        }
+                        struct ebr_extended *ebr_inicial = malloc(sizeof(struct ebr_extended));
+                        ebr_inicial->part_status = '0';
+                        /*ebr_inicial->part_fit='f';*/
+                        ebr_inicial->part_start= EspacioLibre_min[i];
+                        ebr_inicial->part_size = 0;
+                        ebr_inicial->part_next = -1;
+                        int byte_pos = EspacioLibre_min[i] + 140;
+                        printf("\nEscribiendo EBR en: %d\n", byte_pos);
+                        FILE *file_ext = fopen(val_direccion, "rb+");
+                        fseek(file_ext, byte_pos ,SEEK_SET);
+                        created = 1;
+                        if (file_ext != NULL) {
+                            fwrite(ebr_inicial, sizeof(struct ebr_extended), 1, file_ext);
+                            fclose(file_ext);
+                            created = 1;
+                        }
+                    }else{ printf("ERROR: nombre muy extenso para la particion.");}
+                }
+            }
+        }
+    }
+    if(s_flag == 0)
+    {
+        printf("\n:(\n");
+    }
+    if(created == 1)
+    {
+        printf("\nParticion extendida creada exitosamente.\n");
+    }
+    /*---------------------------------------------------------------------------*/
 }
 
 int cargarArchivoDisco()
@@ -228,6 +773,7 @@ int cargarArchivoDisco()
         }
     }*/
 }
+
 void crearParticion()
 {
     /*leer disco*/
@@ -240,16 +786,20 @@ void crearParticion()
         d_mbr.particiones_logicas = 0;*/
         /*d_mbr.*/
         /*Escribir MBR*/
-        int min_byte = 1024 * 1024 * 2;
+        int min_byte = 1024 * 1024 * 2 -1;
         int t_bytes = 0;
+        /*printf("!!!%c!!!" ,val_unit[0]);*/
         if(val_unit[0] == 'k')
         {
             t_bytes = 1024 * val_size -1;
+            /*printf("\nKiloBytes;");*/
         }
         else if(val_unit[0] == 'm')
         {
             t_bytes = 1024 * 1024 * val_size -1;
+            /*printf("\nMegaBytes;");*/
         }
+        /*printf("\n3[%d]", val_size);*/
         /*Convertir int a char*/
         char str_val[10];
         sprintf(str_val, "%d", t_bytes);
@@ -265,8 +815,10 @@ void crearParticion()
                 printf("\nParticion primaria seleccionada...\n");
                 if(extendidas+primarias <4)
                 {
+                    printf("Particion primaria:[Primaria:%d][Extendida:%d]", primarias, extendidas);
                     if(primarias == 0 && extendidas == 0)
                     {
+                        printf("\nprimera particion\n");
                         /*Es la primera*/
                         if(val_size <= mbr_p->mbr_tamano)
                         {
@@ -283,7 +835,16 @@ void crearParticion()
                                 mbr_p->mbr_partition[0].part_type = 'p';
                                 mbr_p->mbr_partition[0].part_fit = val_fit;
                                 mbr_p->mbr_partition[0].part_start = 0;
-                                mbr_p->mbr_partition[0].part_size = val_size;
+                                mbr_p->mbr_partition[0].part_size = t_bytes;
+                                printf("\nTamano:%d", t_bytes);
+                                FILE *file = fopen(val_direccion, "rb+");
+                                size_t tam = sizeof(struct mbr_DISCO);
+                                printf("\nVALOR EN BYTES[%zu]\n", tam);
+                                if(file != NULL)
+                                {
+                                    fwrite(mbr_p, sizeof(struct mbr_DISCO), 1, file);
+                                    fclose(file);
+                                }
                             }
                             else
                             {
@@ -294,18 +855,23 @@ void crearParticion()
                         {
                             printf("ERROR: Excede la capacidad del disco");
                         }
+                    }else
+                    {
+                        printf("\NO es la primera particion\n");
+                        setMinimos();
+                        Particionar(t_bytes);
                     }
                 }
                 else
                 {
-                    printf("ERROR: particion primaria");
+                    printf("ERROR: particion primaria[Primaria:%d][Extendida:%d]", primarias, extendidas);
                 }
             }else if(val_type[0] == 'e')
             {
                 printf("\nParticion extendida seleccionada...\n");
-                if(extendidas == 0)
+                if(extendidas == 0 && primarias < 4)
                 {
-
+                    particionExendida(t_bytes);
                 }else
                 {
                     printf("ERROR: particion extendida");
@@ -315,16 +881,17 @@ void crearParticion()
                 printf("\nParticion logica seleccionada...\n");
                 if(extendidas == 1)
                 {
-
+                    particionLogica(t_bytes);
+                    reporteLogicas();
                 }else
                 {
-                    printf("ERROR: particion logica");
+                    printf("ERROR: no hay particion extendida.");
                 }
             }
         }
         else
         {
-            printf("ERROR: el tamano minimo de particionado es de 2MB");
+            printf("\nERROR: el tamano minimo de particionado es de %d:%d",min_byte, t_bytes );
         }
     }
 
@@ -714,7 +1281,7 @@ int getValorEntero(char* comando)/*Enviar comando completo, devuelve valor del c
     char** ArregloComando;
     ArregloComando = str_split(comando, ':');
     sscanf(*(ArregloComando +1), "%d", &respuesta);
-    /*printf("[%d]", respuesta);*/
+    printf("[%d]", respuesta);
     return respuesta;
 }
 char *getValorCadena(char *comando)/*Enviar comando completo, devuelve el valor de la cadena*/
@@ -814,8 +1381,8 @@ void automata(char** entradaTotal, char* entradaUnica, int posicion)
         else if(strcmp(token, sizee)==0)
         {
             bool_sizee = 1;
-            printf(*(entradaTotal + posicion));
             val_size = getValorEntero(*(entradaTotal + posicion));
+            printf("2[%d]", val_size);
             automata(entradaTotal,*(entradaTotal + posicion+1), posicion+1);
         }
         else if(strcmp(token, unit)==0)
@@ -989,7 +1556,7 @@ int main()
         master_Driver();
     /*}*/
     /*-------------------------------------------------------------*/
-    if (tokens)
+    /*if (tokens)
     {
         int i;
         for (i = 0; *(tokens + i); i++)
@@ -997,6 +1564,6 @@ int main()
             printf("Ultima revision, palabra [%d]=[%s]\n", i, *(tokens + i));
         }
         printf("\n");
-    }
+    }*/
     return 0;
 }
