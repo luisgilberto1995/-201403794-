@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -6,6 +7,8 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <inttypes.h>
+#include <time.h>
+
     int estado;
     int tamanoArreglo;
     char** arreglo;
@@ -17,11 +20,13 @@
     /****************************/
     int minimos1[4];
     int superior[4];
+    char tipos[4];
     char nombres[4][16];
     /****************************/
     int LimSuperior[4];
     int LimInferior[4];
     char LimNombres[4][16];
+    char LimTipos[4];
     /****************************/
     int EspacioLibre[5];
     int EspacioLibre_min[5];
@@ -47,12 +52,20 @@
 
     int bool_mount = 0;
     int bool_unmount = 0;
-    /*----------------------------*/
+
+    int bool_rep = 0;
+    int bool_id = 0;
+
+    int bool_exec = 0;
+
+    int bool_bs = 0;
+    /*--------------------rep -id::vda0 -path::"/home/luis/Escritorio/rep1/rep2/rep3/reporte1.png" -name::mbr --------*/
     /*     Banderas reservadas   */
     /*----------------------------*/
     int val_add = 0;
     int val_delete = 0;
     int val_size = 0;
+    char *val_tipo_reporte ;/*0 = mbr,  1 = disk*/
     char val_fit;/*BF 1, FF 2, WF 3*/
     char val_unit[1] = "m";
     char* val_direccion;
@@ -60,6 +73,7 @@
     char* nombre_fdisk;
     char val_type[1] = "p";
     char* val_un_id;
+    char *val_folderPath;
     /*----------------------------*/
     /*Valores reservados*/
     /*----------------------------*/
@@ -98,7 +112,7 @@
     typedef struct mbr_DISCO
     {
         int mbr_tamano;/*En KB*/
-        time_t mbr_fecha_creacion;
+        char mbr_fecha_creacion[32];
         int mbr_disk_signature;/*numero random*/
         particion mbr_partition[4];
     }mbr_DISCO, *D_actual;
@@ -193,7 +207,7 @@ void reporteLogicas()
             FILE * file= fopen(val_direccion, "rb");
             if (file != NULL)
             {
-                fseek(file, start + 140 ,SEEK_SET);
+                fseek(file, start + 152 ,SEEK_SET);
                 fread(ebr_actual, sizeof(struct ebr_extended), 1, file);
                 fclose(file);
             }
@@ -293,6 +307,7 @@ void Particionar(int valor_size)
                         mbr_p->mbr_partition[a].part_type = 'p';
                         mbr_p->mbr_partition[a].part_size = valor_size;
                         mbr_p->mbr_partition[a].part_start = EspacioLibre_min[i];
+                        mbr_p->mbr_partition[a].part_fit = val_fit;
                         printf("\nEsta particion inicia en: %d", EspacioLibre_min[i]);
                         printf("\nTamano de la particion: %d", valor_size);
                         FILE *file = fopen(val_direccion, "rb+");
@@ -313,7 +328,10 @@ void Particionar(int valor_size)
     }
     if(s_flag == 0)
     {
-        printf("\n:(\n");
+        printf("\n ERROR :(\n");
+    }else
+    {
+        printf("\n Particion primaria creada.\n");
     }
     /*---------------------------------------------------------------------------*/
 }
@@ -365,11 +383,11 @@ void particionLogica(int t_bytes)
     int default_size = mbr_p->mbr_partition[pos].part_size;
     int default_start = mbr_p->mbr_partition[pos].part_start;
     int start =         mbr_p->mbr_partition[pos].part_start ;
-    printf("\nParticion extendida, fisicamente inicia en: %d de tamano: %d", start+140, default_size);
+    printf("\nParticion extendida, fisicamente inicia en: %d de tamano: %d", start+152, default_size);
     struct ebr_extended *ebr_actual=malloc(sizeof(struct ebr_extended));
     FILE * file= fopen(val_direccion, "rb");
     if (file != NULL) {
-        fseek(file, start+140 ,SEEK_SET);
+        fseek(file, start+152 ,SEEK_SET);
         fread(ebr_actual, sizeof(struct ebr_extended), 1, file);
         fclose(file);
     }
@@ -395,11 +413,11 @@ void particionLogica(int t_bytes)
                 ebr_actual->part_size = t_bytes;
                 ebr_actual->part_next = -1;
                 /**/
-                printf("\nActualizando fisicamente EBR en: %d", start+140);
+                printf("\nActualizando fisicamente EBR en: %d", start+152);
                 /**/
                 FILE * file_update = fopen(val_direccion, "rb+");
                 if (file_update != NULL) {
-                    fseek(file_update, start+140 ,SEEK_SET);
+                    fseek(file_update, start+152 ,SEEK_SET);
                     fwrite(ebr_actual, sizeof(struct ebr_extended), 1, file_update);
                     fclose(file_update);
                 }
@@ -437,11 +455,11 @@ void particionLogica(int t_bytes)
 
                     ebr_actual->part_status ='1';
                     /**/
-                    printf("\nActualizando fisicamente EBR en: %d", default_start +140);
+                    printf("\nActualizando fisicamente EBR en: %d", default_start +152);
                     /**/
                     FILE * file_update = fopen(val_direccion, "rb+");
                     if (file_update != NULL) {
-                        fseek(file_update, start+140 ,SEEK_SET);
+                        fseek(file_update, start+152 ,SEEK_SET);
                         fwrite(ebr_actual, sizeof(struct ebr_extended), 1, file_update);
                         fclose(file_update);
                         confirmacion = 1;
@@ -483,10 +501,10 @@ void particionLogica(int t_bytes)
                             ebr_actual->part_next = ebr_nuevo->part_start;
 
                             /*start = ebr_nuevo->part_start;*/
-                            printf("\nActualizando EBR en:%d su nuevo part_start: %d" , ebr_actual->part_start+140, ebr_actual->part_next);
+                            printf("\nActualizando EBR en:%d su nuevo part_start: %d" , ebr_actual->part_start+152, ebr_actual->part_next);
                             FILE * file_update= fopen(val_direccion, "rb+");
                             if (file_update != NULL) {
-                                fseek(file_update, ebr_actual->part_start+140 ,SEEK_SET);
+                                fseek(file_update, ebr_actual->part_start+152 ,SEEK_SET);
                                 fwrite(ebr_actual, sizeof(struct ebr_extended), 1, file_update);
                                 fclose(file_update);
                                 printf("\n???");
@@ -494,7 +512,7 @@ void particionLogica(int t_bytes)
                             printf("\nEscribiendo fisicamente ultimo EBR en:%d", ebr_nuevo->part_start);
                             FILE * file= fopen(val_direccion, "rb+");
                             if (file != NULL) {
-                                fseek(file, ebr_nuevo->part_start+140 ,SEEK_SET);
+                                fseek(file, ebr_nuevo->part_start+152 ,SEEK_SET);
                                 fwrite(ebr_nuevo, sizeof(struct ebr_extended), 1, file);
                                 fclose(file);
                                 confirmacion = 1;
@@ -532,13 +550,13 @@ void particionLogica(int t_bytes)
 
                             FILE * file_update= fopen(val_direccion, "rb+");
                             if (file_update != NULL) {
-                                fseek(file_update, ebr_actual->part_start+140 ,SEEK_SET);
+                                fseek(file_update, ebr_actual->part_start+152 ,SEEK_SET);
                                 fwrite(ebr_actual, sizeof(struct ebr_extended), 1, file_update);
                                 fclose(file_update);
                             }
                             FILE * file= fopen(val_direccion, "rb+");
                             if (file != NULL) {
-                                fseek(file, ebr_nuevo->part_start +140,SEEK_SET);
+                                fseek(file, ebr_nuevo->part_start +152,SEEK_SET);
                                 fwrite(ebr_nuevo, sizeof(struct ebr_extended), 1, file);
                                 fclose(file);
                                 confirmacion = 1;
@@ -556,7 +574,7 @@ void particionLogica(int t_bytes)
                     {
                         FILE * file5= fopen(val_direccion, "rb");
                         if (file5 != NULL) {
-                            fseek(file5, ebr_actual->part_next+140 ,SEEK_SET);
+                            fseek(file5, ebr_actual->part_next+152 ,SEEK_SET);
                             fread(ebr_actual, sizeof(struct ebr_extended), 1, file5);
                             fclose(file5);
                         }
@@ -655,7 +673,7 @@ void eliminarParticion()
                     FILE * file= fopen(val_direccion, "rb");
                     if (file != NULL)
                     {
-                        fseek(file, start + 140 ,SEEK_SET);
+                        fseek(file, start + 152 ,SEEK_SET);
                         fread(ebr_actual, sizeof(struct ebr_extended), 1, file);
                         fclose(file);
                     }
@@ -672,7 +690,7 @@ void eliminarParticion()
 
                         FILE * file_update = fopen(val_direccion, "rb+");
                         if (file_update != NULL) {
-                            fseek(file_update, start+140 ,SEEK_SET);
+                            fseek(file_update, start+152 ,SEEK_SET);
                             fwrite(ebr_actual, sizeof(struct ebr_extended), 1, file_update);
                             fclose(file_update);
                         }
@@ -687,14 +705,14 @@ void eliminarParticion()
                         FILE * file_anterior= fopen(val_direccion, "rb");
                         if (file_anterior != NULL)
                         {
-                            fseek(file_anterior, ebr_actual->part_start + 140 ,SEEK_SET);
+                            fseek(file_anterior, start + 152 ,SEEK_SET);
                             fread(ebr_anterior, sizeof(struct ebr_extended), 1, file_anterior);
                             fclose(file_anterior);
                         }
                         FILE * file_presente= fopen(val_direccion, "rb");
                         if (file_presente != NULL)
                         {
-                            fseek(file_presente, ebr_actual->part_next + 140 ,SEEK_SET);
+                            fseek(file_presente, ebr_actual->part_next + 152 ,SEEK_SET);
                             fread(ebr_actual, sizeof(struct ebr_extended), 1, file_presente);
                             fclose(file_presente);
                         }
@@ -706,7 +724,7 @@ void eliminarParticion()
                             printf("\n (%s, %s)", name, nombre_fdisk);
                             if(strcmp(nombre_fdisk, name)==0)
                             {
-                                printf("\n Encontrado!");
+                                printf("\n Encontrado!........................");
                                 primero = 1;
                                 int extremo = 0;
                                 if(ebr_actual->part_next == -1)
@@ -715,8 +733,8 @@ void eliminarParticion()
                                     ebr_anterior->part_next = -1;
                                     FILE * file_update = fopen(val_direccion, "rb+");
                                     if (file_update != NULL) {
-                                            printf("\n Actualizando anterior en: %d", ebr_anterior->part_start+140 );
-                                        fseek(file_update, ebr_anterior->part_start+140 ,SEEK_SET);
+                                            printf("\n Actualizando anterior en: %d", ebr_anterior->part_start+152 );
+                                        fseek(file_update, ebr_anterior->part_start+152 ,SEEK_SET);
                                         fwrite(ebr_anterior, sizeof(struct ebr_extended), 1, file_update);
                                         fclose(file_update);
                                     }
@@ -725,7 +743,7 @@ void eliminarParticion()
                                         char cero[1];
                                         cero[0] = '\0';
                                         FILE *fp = fopen(val_direccion, "rb+");
-                                        fseek(fp, ebr_actual->part_start+140 , SEEK_SET);
+                                        fseek(fp, ebr_actual->part_start+152 , SEEK_SET);
                                         int z;
                                         int q = ebr_actual->part_size;
                                         for(z=0; z< q; z++)
@@ -736,7 +754,7 @@ void eliminarParticion()
                                     }
                                 }else
                                 {
-                                    printf("\n En medio");
+                                    printf("\n En medio........................");
                                     extremo = ebr_actual->part_next;
                                     ebr_anterior->part_next = extremo;
                                     ebr_actual->part_fit ='\0';
@@ -745,9 +763,9 @@ void eliminarParticion()
                                     ebr_actual->part_status = '0';
                                     FILE * file_update = fopen(val_direccion, "rb+");
                                     if (file_update != NULL) {
-                                            printf("\n Actualizando anterior en: %d", ebr_anterior->part_start+140 );
-                                        fseek(file_update, ebr_anterior->part_start+140 ,SEEK_SET);
-                                        fwrite(ebr_actual, sizeof(struct ebr_extended), 1, file_update);
+                                            printf("\n Actualizando anterior en: %d", ebr_anterior->part_start+152 );
+                                        fseek(file_update, ebr_anterior->part_start+152 ,SEEK_SET);
+                                        fwrite(ebr_anterior, sizeof(struct ebr_extended), 1, file_update);
                                         fclose(file_update);
                                     }
                                     if(val_delete == 1)
@@ -755,7 +773,7 @@ void eliminarParticion()
                                         char cero[1];
                                         cero[0] = '\0';
                                         FILE *fp = fopen(val_direccion, "rb+");
-                                        fseek(fp, ebr_actual->part_start+140 , SEEK_SET);
+                                        fseek(fp, ebr_actual->part_start+152 , SEEK_SET);
                                         int z;
                                         int q = ebr_actual->part_size;
                                         for(z=0; z< q; z++)
@@ -776,14 +794,14 @@ void eliminarParticion()
                                 FILE * file11= fopen(val_direccion, "rb");
                                 if (file11 != NULL)
                                 {
-                                    fseek(file11, ebr_actual->part_next + 140 ,SEEK_SET);
+                                    fseek(file11, ebr_actual->part_next + 152 ,SEEK_SET);
                                     fread(ebr_actual, sizeof(struct ebr_extended), 1, file11);
                                     fclose(file11);
                                 }
                                 FILE * file22= fopen(val_direccion, "rb");
                                 if (file22 != NULL)
                                 {
-                                    fseek(file22, ebr_anterior->part_next + 140 ,SEEK_SET);
+                                    fseek(file22, ebr_anterior->part_next + 152 ,SEEK_SET);
                                     fread(ebr_anterior, sizeof(struct ebr_extended), 1, file22);
                                     fclose(file22);
                                 }
@@ -829,7 +847,6 @@ void setMinimos()
         EspacioLibre[i] = 0;
         EspacioLibre_min[i] = 0;
         EspacioLibre_max[i] = 0;
-        EspacioLibre_nombres[i][0]='\0';
     }
     EspacioLibre[4] = 0;
     EspacioLibre_min[4] = 0;
@@ -840,10 +857,11 @@ void setMinimos()
         {
             minimos1[contador] = mbr_p->mbr_partition[i].part_start;
             superior[contador] = mbr_p->mbr_partition[i].part_start + mbr_p->mbr_partition[i].part_size;
+            tipos[contador] = mbr_p->mbr_partition[i].part_type;
             int j;
             for(j = 0; j < 16; j++)
             {
-                nombres[i][j] = mbr_p->mbr_partition[i].part_name[j];
+                nombres[contador][j] = mbr_p->mbr_partition[i].part_name[j];
             }
             printf("\nHay una particion que inicia en: %d y de tamano: %d nombre:%c %c %c\n", mbr_p->mbr_partition[i].part_start, mbr_p->mbr_partition[i].part_size, nombres[i][0], nombres[i][1], nombres[i][2]);
             ++contador;
@@ -858,6 +876,7 @@ void setMinimos()
     /******************************************************************/
     int mini = minimos1[0];
     int max = superior[0];
+    char tipi = tipos[0];
     char pivote_nombre[16];
     int u;
     for(u = 0; u< 16; u++)
@@ -869,6 +888,7 @@ void setMinimos()
     {
         LimInferior[count2] = mini;
         LimSuperior[count2] = max;
+        LimTipos[count2] = tipi;
         for(u = 0; u<16; u++)
         {
             LimNombres[count2][u] = pivote_nombre[u];
@@ -887,6 +907,7 @@ void setMinimos()
             {
                 mini = minimos1[y];
                 max = superior[y];
+                tipi = tipos[y];
                 int j;
                 for(j = 0; j < 16; j++)
                 {
@@ -905,6 +926,7 @@ void setMinimos()
             {
                 mini = minimos1[y];
                 max = superior[y];
+                tipi = nombres[y];
                 for(u =0; u<16; u++)
                 {
                     pivote_nombre[u] = nombres[y][u];
@@ -917,6 +939,7 @@ void setMinimos()
         {*/
             LimInferior[count2] = mini;
             LimSuperior[count2] = max;
+            LimTipos[count2] = tipi;
             for(u = 0; u<16; u++)
             {
                 LimNombres[count2][u] = pivote_nombre[u];
@@ -1130,7 +1153,7 @@ void modificarParticion()
             FILE * file= fopen(val_direccion, "rb");
             if (file != NULL)
             {
-                fseek(file, default_start+140 ,SEEK_SET);
+                fseek(file, default_start+152 ,SEEK_SET);
                 fread(ebr_actual, sizeof(struct ebr_extended), 1, file);
                 fclose(file);
             }
@@ -1151,7 +1174,7 @@ void modificarParticion()
                             ebr_actual->part_size = ebr_actual->part_size + val_add;
                             FILE * file_update = fopen(val_direccion, "rb+");
                             if (file_update != NULL) {
-                                fseek(file_update, ebr_actual->part_start+140 ,SEEK_SET);
+                                fseek(file_update, ebr_actual->part_start+152 ,SEEK_SET);
                                 fwrite(ebr_actual, sizeof(struct ebr_extended), 1, file_update);
                                 fclose(file_update);
                             }
@@ -1166,7 +1189,7 @@ void modificarParticion()
                            ebr_actual->part_size = resultado;
                            FILE * file_update = fopen(val_direccion, "rb+");
                             if (file_update != NULL) {
-                                fseek(file_update, ebr_actual->part_start+140 ,SEEK_SET);
+                                fseek(file_update, ebr_actual->part_start+152 ,SEEK_SET);
                                 fwrite(ebr_actual, sizeof(struct ebr_extended), 1, file_update);
                                 fclose(file_update);
                             }
@@ -1200,7 +1223,7 @@ void modificarParticion()
                                     ebr_actual->part_size = ebr_actual->part_size + val_add;
                                     FILE * file_update = fopen(val_direccion, "rb+");
                                     if (file_update != NULL) {
-                                        fseek(file_update, ebr_actual->part_start+140 ,SEEK_SET);
+                                        fseek(file_update, ebr_actual->part_start+152 ,SEEK_SET);
                                         fwrite(ebr_actual, sizeof(struct ebr_extended), 1, file_update);
                                         fclose(file_update);
                                     }
@@ -1217,7 +1240,7 @@ void modificarParticion()
                                     ebr_actual->part_size = resultado;
                                     FILE * file_update = fopen(val_direccion, "rb+");
                                     if (file_update != NULL) {
-                                        fseek(file_update, ebr_actual->part_start+140 ,SEEK_SET);
+                                        fseek(file_update, ebr_actual->part_start+152 ,SEEK_SET);
                                         fwrite(ebr_actual, sizeof(struct ebr_extended), 1, file_update);
                                         fclose(file_update);
                                     }
@@ -1232,7 +1255,7 @@ void modificarParticion()
                         FILE * file= fopen(val_direccion, "rb");
                         if (file != NULL)
                         {
-                            fseek(file, ebr_actual->part_next+140 ,SEEK_SET);
+                            fseek(file, ebr_actual->part_next+152 ,SEEK_SET);
                             fread(ebr_actual, sizeof(struct ebr_extended), 1, file);
                             fclose(file);
                         }
@@ -1278,6 +1301,7 @@ void particionExendida(int valor_size)
                         mbr_p->mbr_partition[a].part_type = 'e';
                         mbr_p->mbr_partition[a].part_size = valor_size;
                         mbr_p->mbr_partition[a].part_start = EspacioLibre_min[i];
+                        mbr_p->mbr_partition[a].part_fit = val_fit;
                         printf("\nEsta particion inicia en: %d", EspacioLibre_min[i]);
                         printf("\nTamano de la particion: %d", valor_size);
                         FILE *file = fopen(val_direccion, "rb+");
@@ -1297,7 +1321,7 @@ void particionExendida(int valor_size)
                         printf("\nEBR inicia en: %d", ebr_inicial->part_start);
                         ebr_inicial->part_size = 0;
                         ebr_inicial->part_next = -1;
-                        int byte_pos = EspacioLibre_min[i] + 140;
+                        int byte_pos = EspacioLibre_min[i] + 152;
                         printf("\nEscribiendo EBR en: %d\n", byte_pos);
                         FILE *file_ext = fopen(val_direccion, "rb+");
                         fseek(file_ext, byte_pos ,SEEK_SET);
@@ -1341,59 +1365,65 @@ int cargarArchivoDisco()
         load_disk_flag = 0;
         printf("ERROR: No se encontró el disco");
     }
-    /*primerDisco->mbr_tamano = 10 * 1024 * 1024;
-    primerDisco->mbr_partition[0].part_status = 1;
-    primerDisco->mbr_partition[0].part_status = 1;
-    FILE * file= fopen("disc.dsk", "wb");
-    if (file != NULL) {
-        fwrite(primerDisco, sizeof(struct mbr_DISCO), 1, file);
-        fclose(file);
-    }
+}
 
-    mbr_DISCO *primerDiscoleido = malloc(sizeof(struct mbr_DISCO));
-    FILE * file2= fopen("disco.dsk", "rb");
-    if (file2 != NULL) {
-        fread(primerDiscoleido, sizeof(struct mbr_DISCO), 1, file2);
-        fclose(file2);
-    }
-
-    printf("\n*[%d]\n", primerDisco->mbr_disk_signature);
-    /*int tamanoArchivo = filesize(val_direccion)-512;
-    d_mbr.tamanoDisco = tamanoArchivo;
-    if(tamanoArchivo == -513)
+void cargarArchivoDisco2()
+{
+    printf("\n Cargando el disco de la particion seleccionada: %s.", val_un_id);
+    char *nuevoPath;
+    char cabecera_array[5] = "abcd";
+    printf("\n Buscando disco de la particion.");
+    int rango = 0;
+    char letra = *(val_un_id +2);
+    int fila = *(val_un_id +3) - '0';
+    if(letra == 'a' || letra == 'b' || letra == 'c' || letra == 'd')
     {
-        printf("Error, no se encontró el disco");
+        rango = 1;
+    }
+    if(fila >= 0 && fila < 4)
+    {
+        rango = rango +1;
     }else
     {
-        FILE *myfile;
-        int i;
-        unsigned char inicio[1];
-        myfile = fopen(val_direccion, "r");
-        for(i = 0; i < 1; i++){
-            fread(&inicio[i], 1, 1, myfile);
-        }
-        printf("char[%c]", inicio[0]);
-        if(inicio[0]=='\0')
+        rango = 0;
+    }
+    int x = 0;
+    if(rango == 2)
+    {
+        if(letra == 'a')
         {
-            printf("Disco vacío!\n");
-
-        }else{
-            printf("Disco lleno!\n");
-            int paso2 = 0;
-            if(val_type[0] == 'p')
-            {
-                t_bytes = 1024 * val_size -1;
-            }
-            else if(val_type[0] == 'e')
-            {
-                t_bytes = 1024 * 1024 * val_size -1;
-            }
-            else if(val_type[0] == 'l')
-            {
-                t_bytes = 1024 * 1024 * val_size -1;
-            }
+            x = 0;
+        }else if(letra == 'b')
+        {
+            x = 1;
+        }else if(letra == 'c')
+        {
+            x = 2;
+        }else if(letra == 'd')
+        {
+            x = 3;
         }
-    }*/
+        printf("\nx: %d y:%d", x, fila);
+        if(fila == 0)
+        {
+            nuevoPath =path1[x];
+        }
+         else if(fila == 1)
+        {
+            nuevoPath =path2[x];
+        }
+        else if(fila == 2)
+        {
+            nuevoPath =path3[x];
+        }
+        else if(fila == 3)
+        {
+            nuevoPath =path4[x];
+        }
+    }
+    val_direccion = nuevoPath;
+    printf("\n Nuevo path= %s", val_direccion);
+    cargarArchivoDisco();
 }
 
 void crearParticion()
@@ -1435,7 +1465,7 @@ void crearParticion()
             if(val_type[0] == 'p')
             {
                 printf("\nParticion primaria seleccionada...\n");
-                if(extendidas+primarias <4)
+                if(extendidas+primarias < 4)
                 {
                     printf("Particion primaria:[Primaria:%d][Extendida:%d]", primarias, extendidas);
                     if(primarias == 0 && extendidas == 0)
@@ -1455,6 +1485,7 @@ void crearParticion()
                                     mbr_p->mbr_partition[0].part_name[c] = *(nombre_fdisk + c);
                                 }
                                 mbr_p->mbr_partition[0].part_type = 'p';
+                                printf("\n !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!1EL FIT DEL DISCO ES: %c", val_fit);
                                 mbr_p->mbr_partition[0].part_fit = val_fit;
                                 mbr_p->mbr_partition[0].part_start = 0;
                                 mbr_p->mbr_partition[0].part_size = t_bytes;
@@ -1486,7 +1517,7 @@ void crearParticion()
                 }
                 else
                 {
-                    printf("ERROR: particion primaria[Primaria:%d][Extendida:%d]", primarias, extendidas);
+                    printf("ERROR1: particion primaria[Primaria:%d][Extendida:%d]", primarias, extendidas);
                 }
             }else if(val_type[0] == 'e')
             {
@@ -1518,8 +1549,6 @@ void crearParticion()
     }
 
 }
-
-
 
 int tamano3(char *arreglo)
 {
@@ -1569,6 +1598,44 @@ char *arregloDireccion(char *comando)
     return respuesta;
 }
 
+char *arregloDireccion2(char *comando)
+{
+    int tamanio = contadorDiagonales(comando);
+    int tamanioTotal = tamano3(comando);
+    char *respuesta;
+    respuesta =(char*)malloc(tamanio +tamanioTotal);
+    int d;
+    int count = 0;
+    int bul = 0;
+    for(d = 0; d < tamanio +tamanioTotal -1; d++)
+    {
+        if(*(comando+d) == '/')
+        {
+            if(bul == 0)
+            {
+                bul = 1;
+                *(respuesta + count) = *(comando +d);
+                ++count;
+            }else
+            {
+                *(respuesta + count) = ',';
+                ++count;
+                *(respuesta + count) = *(comando +d);
+                ++count;
+            }
+        }
+        else
+        {
+            *(respuesta + count) = *(comando +d);
+            ++count;
+        }
+    }
+    printf("\n&&&&&&&&&&&&&&&&&&&&\n");
+    printf(respuesta);
+    printf("\n&&&&&&&&&&&&&&&&&&&&");
+    return respuesta;
+}
+
 void escrituraPrueba()
 {
     FILE *fp = fopen("DISCO", "ab+");
@@ -1601,11 +1668,9 @@ char *concatenarDireccion(char **arregloDirecciones, int direcciones)
     int tamanos[direcciones];
     if(direcciones == 1)
     {
-        printf("direcciones[%d]", direcciones);
         return *(arregloDirecciones +0);
     }else
     {
-        printf("direcciones[%d]", direcciones);
         int i;
         int j;
         int count = 0;
@@ -1616,15 +1681,17 @@ char *concatenarDireccion(char **arregloDirecciones, int direcciones)
             tamanos[i] = tamano3(*(arregloDirecciones+i));
             maximos[i] = tamanio;
         }
-        printf("tamanio:%d", tamanio);
         respuesta =(char*)malloc(tamanio+1);
         for(i = 0; i < direcciones; i++)
         {
             char *actual = *(arregloDirecciones + i);
             for(j = 0; j< tamanos[i]; j++)
             {
-                *(respuesta + count) = *(actual+j);
-                ++count;
+                if(*(actual+j) != '\0')
+                {
+                    *(respuesta + count) = *(actual+j);
+                    ++count;
+                }
             }
         }
     }
@@ -1646,6 +1713,892 @@ char *concatenacion(char *parametro1, char *parametro2)
     printf(respuesta);
     printf("\n-");*/
     return respuesta;
+}
+
+void asignar_FolderPath(char *extension, char *ubicacion_original)
+{
+    char *direccion = val_direccion;
+    /*printf("\n asignar_FolderPath: %s", direccion);*/
+    int tam = tamano3(val_direccion);
+    int i;
+    int size = 0;
+    for(i = tam-1; i< tamano3; i--)
+    {
+        if(*(val_direccion + i) == '/')
+        {
+            break;
+        }else
+        {
+            size = size +1;
+        }
+    }
+    size = size;
+    char respuesta_archivo[size];
+    char respuesta_carpeta[tam -size];
+    int cont = 0;
+    /*printf("\n resta: %d", size);*/
+    for(i = tam-size; i< tam; i++)
+    {
+        respuesta_archivo[cont] = *(val_direccion +i);
+        /*printf("\n %c: ", *(val_direccion +i));*/
+        ++cont;
+    }
+    for(i = 0; i < tam-size-1; i++)
+    {
+        respuesta_carpeta[i] = *(val_direccion +i);
+
+    }
+    respuesta_carpeta[tam-size-1] = '\0';
+    val_folderPath = respuesta_carpeta;
+    /*printf("\n ValFolderPath: %s", val_folderPath);*/
+    crearCarpetas(respuesta_carpeta, extension, ubicacion_original);
+}
+
+void crearCarpetas(char val_folderPath1[], char *extension,char *ubicacion_original)
+{
+    char *direccionActual = val_folderPath1;
+    struct stat st = {0};
+    if(stat(val_folderPath1, &st) == -1)
+    {
+        printf("\nCreando carpetas[%s]...\n", val_folderPath1);
+        char *paraSplit;
+        paraSplit = arregloDireccion2(val_folderPath1);
+        char** carpetas = str_split(paraSplit ,',');
+        int carpetas_count = tamano(carpetas);
+        int b = 0;
+        while(b < carpetas_count)
+        {
+            direccionActual = concatenarDireccion(carpetas, b+1);
+            printf("[[%d]", b);
+            printf(direccionActual);
+            printf("]");
+            if(stat(direccionActual, &st) == -1)
+            {
+                printf("\nno existe\n");
+                mkdir(direccionActual, 0700);
+                printf("Ahora ya existe\n");
+            }
+            else
+            {
+                printf("\nsi existe\n");
+            }
+            ++b;
+        }
+    }
+    char *char_mbr = "mbr";
+    char *char_disk = "disk";
+    printf("[char: %s, usuario: %s]", char_mbr, val_tipo_reporte);
+    if(strcmp(val_tipo_reporte, char_disk)==0)
+    {
+        reporte_disk(direccionActual, extension, ubicacion_original);
+    }
+    else if(strcmp(val_tipo_reporte, char_mbr)==0)
+    {
+        reporte_mbr(direccionActual, extension, ubicacion_original);
+    }
+}
+
+void reporte_mbr(char *direccion, char *extension, char *ubicacion_original)
+{
+    printf("\n REPORTE MBR\n Extension: %s", extension);
+    char *jpg = "jpg";
+    char *png = "png";
+    char *extensionDot = "dot -Tpng ";
+    char *output = " -o ";
+    if(strcmp(extension, jpg)==0)
+    {
+        extensionDot = "dot -Tjpg ";
+    }if(strcmp(extension, png)==0)
+    {
+        extensionDot = "dot -Tpng ";
+    }
+    cargarArchivoDisco2();
+    char nada[1] ;
+    nada[0] = ' ';
+    char *nombreArchivo = "/reportembr.dot";
+    char *ubicacion = concatenacion(direccion, nombreArchivo);
+    /*printf("\n [%s]", ubicacion);*/
+    FILE *reporte = fopen(ubicacion, "w");
+    if(reporte != NULL)
+    {
+        fputc(nada[0], reporte);
+        fclose(reporte);
+    }
+    char *cab1 ="digraph G {\n";
+    char *cab2="node [shape=plaintext]\n";
+    char *cab3="a [label=<<table border=\"0\" cellborder=\"1\" cellspacing=\" 0 \" WIDTH=\"50%\">\n";
+    char *endf ="</table>>];}";
+    char *mbrTop = "MBR";
+    char *ebrTop = "EBR";
+    char *ope_tr = "\n<tr>";
+    char *clo_tr = "</tr>\n";
+    char *ope_td = "\n<td WIDTH=\"100\" HEIGHT=\"50\">";
+    char *clo_td = "</td>\n";
+    char intTOchar[20];
+    sprintf(intTOchar, "%d", mbr_p->mbr_tamano);
+    char *fecha = mbr_p->mbr_fecha_creacion;
+    char *palabra;
+    FILE *lapiz = fopen(ubicacion, "a");
+    if(lapiz != NULL)
+    {
+        fprintf(lapiz, "%s", cab1);
+        fprintf(lapiz, "%s", cab2);
+        fprintf(lapiz, "%s", cab3);
+        fprintf(lapiz, "%s", ope_tr);
+        fprintf(lapiz, "%s", ope_td);
+        fprintf(lapiz, "%s", mbrTop);
+        fprintf(lapiz, "%s", clo_td);
+        fprintf(lapiz, "%s", clo_tr);
+
+
+        fprintf(lapiz, "%s", ope_tr);
+
+        fprintf(lapiz, "%s", ope_td);
+        fprintf(lapiz, "%s", "mbr_tamaño");
+        fprintf(lapiz, "%s", clo_td);
+
+        fprintf(lapiz, "%s", ope_td);
+        palabra = intTOchar;
+        fprintf(lapiz, "%s", palabra);
+        fprintf(lapiz, "%s", clo_td);
+
+        fprintf(lapiz, "%s", clo_tr);
+        /*************************************************/
+        fprintf(lapiz, "%s", ope_tr);
+
+        fprintf(lapiz, "%s", ope_td);
+        fprintf(lapiz, "%s", "mbr_fecha_creacion");
+        fprintf(lapiz, "%s", clo_td);
+
+        fprintf(lapiz, "%s", ope_td);
+        fprintf(lapiz, "%s", fecha);
+        fprintf(lapiz, "%s", clo_td);
+
+        fprintf(lapiz, "%s", clo_tr);
+    /*****************************************************/
+    /*************************************************/
+        fprintf(lapiz, "%s", ope_tr);
+
+        fprintf(lapiz, "%s", ope_td);
+        fprintf(lapiz, "%s", "mbr_disk_signature");
+        fprintf(lapiz, "%s", clo_td);
+
+        fprintf(lapiz, "%s", ope_td);
+        fprintf(lapiz, "%d", mbr_p->mbr_disk_signature);
+        fprintf(lapiz, "%s", clo_td);
+
+        fprintf(lapiz, "%s", clo_tr);
+        fclose(lapiz);
+    /*****************************************************/
+    /*************************************************/
+    int y ;
+    for(y = 0; y<4; y++)
+    {
+        if(mbr_p->mbr_partition[y].part_status == '1')
+        {
+            lapiz = fopen(ubicacion, "a");
+            printf("\nIterando.");
+            char *label="partition_";
+            sprintf(intTOchar, "%d", y);
+            char *total_label = concatenacion(label, intTOchar);
+            /*---------------------------------------------------*/
+            fprintf(lapiz, "%s", ope_tr);
+
+            fprintf(lapiz, "%s", ope_td);
+            fprintf(lapiz, "%s", total_label);
+            fprintf(lapiz, "%s", clo_td);
+
+            fprintf(lapiz, "%s", clo_tr);
+            /*-----------------------------------------------------*/
+            /*=====================================================*/
+            fprintf(lapiz, "%s", ope_tr);
+
+            fprintf(lapiz, "%s", ope_td);
+            fprintf(lapiz, "%s", "part_status");
+            fprintf(lapiz, "%s", clo_td);
+
+            fprintf(lapiz, "%s", ope_td);
+            fprintf(lapiz, "%c", mbr_p->mbr_partition[y].part_status);
+            fprintf(lapiz, "%s", clo_td);
+
+            fprintf(lapiz, "%s", clo_tr);
+            /*=====================================================*/
+            /*=====================================================*/
+            fprintf(lapiz, "%s", ope_tr);
+
+            fprintf(lapiz, "%s", ope_td);
+            fprintf(lapiz, "%s", "part_type");
+            fprintf(lapiz, "%s", clo_td);
+
+            fprintf(lapiz, "%s", ope_td);
+            fprintf(lapiz, "%c", mbr_p->mbr_partition[y].part_type);
+            fprintf(lapiz, "%s", clo_td);
+
+            fprintf(lapiz, "%s", clo_tr);
+            /*=====================================================*/
+
+            /*=====================================================*/
+            fprintf(lapiz, "%s", ope_tr);
+
+            fprintf(lapiz, "%s", ope_td);
+            fprintf(lapiz, "%s", "part_fit");
+            fprintf(lapiz, "%s", clo_td);
+
+            fprintf(lapiz, "%s", ope_td);
+            fprintf(lapiz, "%c", mbr_p->mbr_partition[y].part_fit);
+            fprintf(lapiz, "%s", clo_td);
+
+            fprintf(lapiz, "%s", clo_tr);
+            /*=====================================================*/
+            /*=====================================================*/
+            fprintf(lapiz, "%s", ope_tr);
+
+            fprintf(lapiz, "%s", ope_td);
+            fprintf(lapiz, "%s", "part_start");
+            fprintf(lapiz, "%s", clo_td);
+
+            fprintf(lapiz, "%s", ope_td);
+            fprintf(lapiz, "%d", mbr_p->mbr_partition[y].part_start);
+            fprintf(lapiz, "%s", clo_td);
+
+            fprintf(lapiz, "%s", clo_tr);
+            /*=====================================================*/
+            /*=====================================================*/
+            fprintf(lapiz, "%s", ope_tr);
+
+            fprintf(lapiz, "%s", ope_td);
+            fprintf(lapiz, "%s", "part_size");
+            fprintf(lapiz, "%s", clo_td);
+
+            fprintf(lapiz, "%s", ope_td);
+            fprintf(lapiz, "%d", mbr_p->mbr_partition[y].part_size);
+            fprintf(lapiz, "%s", clo_td);
+
+            fprintf(lapiz, "%s", clo_tr);
+            /*=====================================================*/
+            /*=====================================================*/
+            fprintf(lapiz, "%s", ope_tr);
+
+            fprintf(lapiz, "%s", ope_td);
+            fprintf(lapiz, "%s", "part_name");
+            fprintf(lapiz, "%s", clo_td);
+
+            palabra = mbr_p->mbr_partition[y].part_name;
+            fprintf(lapiz, "%s", ope_td);
+            fprintf(lapiz, "%s", palabra);
+            fprintf(lapiz, "%s", clo_td);
+
+            fprintf(lapiz, "%s", clo_tr);
+
+            fclose(lapiz);
+            /*=====================================================*/
+            if(mbr_p->mbr_partition[y].part_type == 'e')
+            {
+                struct ebr_extended *ebr_actual = malloc(sizeof(struct ebr_extended));
+                FILE * lupalogica= fopen(val_direccion, "rb");
+                if (lupalogica != NULL)
+                {
+                    fseek(lupalogica, mbr_p->mbr_partition[y].part_start + 152 ,SEEK_SET);
+                    fread(ebr_actual, sizeof(struct ebr_extended), 1, lupalogica);
+                    fclose(lupalogica);
+                }
+                int contador = 1;
+                char *label2="EBR_";
+                sprintf(intTOchar, "%d", contador);
+                char *total_label2 = concatenacion(label2, intTOchar);
+                if(ebr_actual->part_status == '1')
+                {/*                 SI ESTA ACTIVO EL PRIMER EBR    */
+                /*---------------------------------------------------*/
+                lapiz = fopen(ubicacion, "a");
+                fprintf(lapiz, "%s", ope_tr);
+
+                fprintf(lapiz, "%s", ope_td);
+                fprintf(lapiz, "%s", total_label2);
+                fprintf(lapiz, "%s", clo_td);
+
+                fprintf(lapiz, "%s", clo_tr);
+                /*-----------------------------------------------------*/
+                /*=====================================================*/
+                fprintf(lapiz, "%s", ope_tr);
+
+                fprintf(lapiz, "%s", ope_td);
+                fprintf(lapiz, "%s", "ebr_status");
+                fprintf(lapiz, "%s", clo_td);
+
+                fprintf(lapiz, "%s", ope_td);
+                fprintf(lapiz, "%c", ebr_actual->part_status);
+                fprintf(lapiz, "%s", clo_td);
+
+                fprintf(lapiz, "%s", clo_tr);
+                /*=====================================================*/
+                /*=====================================================*/
+                fprintf(lapiz, "%s", ope_tr);
+
+                fprintf(lapiz, "%s", ope_td);
+                fprintf(lapiz, "%s", "ebr_fit");
+                fprintf(lapiz, "%s", clo_td);
+
+                fprintf(lapiz, "%s", ope_td);
+                fprintf(lapiz, "%c", ebr_actual->part_fit);
+                fprintf(lapiz, "%s", clo_td);
+
+                fprintf(lapiz, "%s", clo_tr);
+                /*=====================================================*/
+                /*=====================================================*/
+                fprintf(lapiz, "%s", ope_tr);
+
+                fprintf(lapiz, "%s", ope_td);
+                fprintf(lapiz, "%s", "ebr_start");
+                fprintf(lapiz, "%s", clo_td);
+
+                fprintf(lapiz, "%s", ope_td);
+                fprintf(lapiz, "%d", ebr_actual->part_start);
+                fprintf(lapiz, "%s", clo_td);
+
+                fprintf(lapiz, "%s", clo_tr);
+                /*=====================================================*/
+                /*=====================================================*/
+                fprintf(lapiz, "%s", ope_tr);
+
+                fprintf(lapiz, "%s", ope_td);
+                fprintf(lapiz, "%s", "ebr_size");
+                fprintf(lapiz, "%s", clo_td);
+
+                fprintf(lapiz, "%s", ope_td);
+                fprintf(lapiz, "%d", ebr_actual->part_size);
+                fprintf(lapiz, "%s", clo_td);
+
+                fprintf(lapiz, "%s", clo_tr);
+                /*=====================================================*/
+                /*=====================================================*/
+                fprintf(lapiz, "%s", ope_tr);
+
+                fprintf(lapiz, "%s", ope_td);
+                fprintf(lapiz, "%s", "ebr_next");
+                fprintf(lapiz, "%s", clo_td);
+
+                fprintf(lapiz, "%s", ope_td);
+                fprintf(lapiz, "%d", ebr_actual->part_next);
+                fprintf(lapiz, "%s", clo_td);
+
+                fprintf(lapiz, "%s", clo_tr);
+                /*=====================================================*/
+                /*=====================================================*/
+                fprintf(lapiz, "%s", ope_tr);
+
+                fprintf(lapiz, "%s", ope_td);
+                fprintf(lapiz, "%s", "ebr_name");
+                fprintf(lapiz, "%s", clo_td);
+                palabra = ebr_actual->part_name;
+                fprintf(lapiz, "%s", ope_td);
+                fprintf(lapiz, "%s", palabra);
+                fprintf(lapiz, "%s", clo_td);
+
+                fprintf(lapiz, "%s", clo_tr);
+                fclose(lapiz);
+                /*=====================================================*/
+                }
+                ++contador;
+                int stat = ebr_actual->part_next;
+                printf("\n ESTATUS:%d", stat);
+                if(stat != -1)
+                {
+                    lupalogica= fopen(val_direccion, "rb");
+                    if (lupalogica != NULL)
+                    {
+                        fseek(lupalogica, ebr_actual->part_next + 152 ,SEEK_SET);
+                        fread(ebr_actual, sizeof(struct ebr_extended), 1, lupalogica);
+                        fclose(lupalogica);
+                    }
+                }
+                while(stat != -1)
+                {
+                    sprintf(intTOchar, "%d", contador);
+                    total_label2 = concatenacion(label2, intTOchar);
+                    ++contador;
+                    /*---------------------------------------------------*/
+                    lapiz = fopen(ubicacion, "a");
+                    fprintf(lapiz, "%s", ope_tr);
+
+                    fprintf(lapiz, "%s", ope_td);
+                    fprintf(lapiz, "%s", total_label2);
+                    fprintf(lapiz, "%s", clo_td);
+
+                    fprintf(lapiz, "%s", clo_tr);
+                    /*-----------------------------------------------------*/
+                    /*=====================================================*/
+                    fprintf(lapiz, "%s", ope_tr);
+
+                    fprintf(lapiz, "%s", ope_td);
+                    fprintf(lapiz, "%s", "ebr_status");
+                    fprintf(lapiz, "%s", clo_td);
+
+                    fprintf(lapiz, "%s", ope_td);
+                    fprintf(lapiz, "%c", ebr_actual->part_status);
+                    fprintf(lapiz, "%s", clo_td);
+
+                    fprintf(lapiz, "%s", clo_tr);
+                    /*=====================================================*/
+                    /*=====================================================*/
+                    fprintf(lapiz, "%s", ope_tr);
+
+                    fprintf(lapiz, "%s", ope_td);
+                    fprintf(lapiz, "%s", "ebr_fit");
+                    fprintf(lapiz, "%s", clo_td);
+
+                    fprintf(lapiz, "%s", ope_td);
+                    fprintf(lapiz, "%c", ebr_actual->part_fit);
+                    fprintf(lapiz, "%s", clo_td);
+
+                    fprintf(lapiz, "%s", clo_tr);
+                    /*=====================================================*/
+                    /*=====================================================*/
+                    fprintf(lapiz, "%s", ope_tr);
+
+                    fprintf(lapiz, "%s", ope_td);
+                    fprintf(lapiz, "%s", "ebr_start");
+                    fprintf(lapiz, "%s", clo_td);
+
+                    fprintf(lapiz, "%s", ope_td);
+                    fprintf(lapiz, "%d", ebr_actual->part_start);
+                    fprintf(lapiz, "%s", clo_td);
+
+                    fprintf(lapiz, "%s", clo_tr);
+                    /*=====================================================*/
+                    /*=====================================================*/
+                    fprintf(lapiz, "%s", ope_tr);
+
+                    fprintf(lapiz, "%s", ope_td);
+                    fprintf(lapiz, "%s", "ebr_size");
+                    fprintf(lapiz, "%s", clo_td);
+
+                    fprintf(lapiz, "%s", ope_td);
+                    fprintf(lapiz, "%d", ebr_actual->part_size);
+                    fprintf(lapiz, "%s", clo_td);
+
+                    fprintf(lapiz, "%s", clo_tr);
+                    /*=====================================================*/
+                    /*=====================================================*/
+                    fprintf(lapiz, "%s", ope_tr);
+
+                    fprintf(lapiz, "%s", ope_td);
+                    fprintf(lapiz, "%s", "ebr_next");
+                    fprintf(lapiz, "%s", clo_td);
+
+                    fprintf(lapiz, "%s", ope_td);
+                    fprintf(lapiz, "%d", ebr_actual->part_next);
+                    fprintf(lapiz, "%s", clo_td);
+
+                    fprintf(lapiz, "%s", clo_tr);
+                    /*=====================================================*/
+                    /*=====================================================*/
+                    fprintf(lapiz, "%s", ope_tr);
+
+                    fprintf(lapiz, "%s", ope_td);
+                    fprintf(lapiz, "%s", "ebr_name");
+                    fprintf(lapiz, "%s", clo_td);
+                    palabra = ebr_actual->part_name;
+                    fprintf(lapiz, "%s", ope_td);
+                    fprintf(lapiz, "%s", palabra);
+                    fprintf(lapiz, "%s", clo_td);
+
+                    fprintf(lapiz, "%s", clo_tr);
+                    fclose(lapiz);
+                    /*=====================================================*/
+                    if(ebr_actual->part_next != -1)
+                    {
+                        lupalogica= fopen(val_direccion, "rb");
+                        if (lupalogica != NULL)
+                        {
+                            fseek(lupalogica, ebr_actual->part_next + 152 ,SEEK_SET);
+                            fread(ebr_actual, sizeof(struct ebr_extended), 1, lupalogica);
+                            fclose(lupalogica);
+                        }
+
+                    }else
+                    {
+                        stat = -1;
+                    }
+            }
+        }
+    }
+    /*****************************************************/
+    }
+        lapiz = fopen(ubicacion, "a");
+        fprintf(lapiz, "%s", endf);
+        fclose(lapiz);
+    /*################REALIZANDO EL COMANDO################*/
+    char *comando = concatenacion(extensionDot, ubicacion);
+    char *comando2 = concatenacion(comando, output);
+    char *comandoFinal = concatenacion(comando2, ubicacion_original);
+    printf("\n Ejecutando llamada a graphviz = %s", comandoFinal);
+    system(comandoFinal);
+    printf("\n fin");
+}
+}
+
+void printExtendida(char *ubicacion)
+{
+    printf("\n Extendida...");
+    int o ;
+    int pos = 0;
+    for(o = 0; o<4; o++)
+    {
+        if(mbr_p->mbr_partition[o].part_status == '1')
+        {
+            if(mbr_p->mbr_partition[o].part_type == 'e')
+            {
+                /*printf("\n Encontré la extendida!!!!!!!!!!!!!!!!!!!!!!!!!!");*/
+                pos = o;
+                break;
+            }
+        }
+    }
+    int default_size = mbr_p->mbr_partition[pos].part_size;
+    int default_start = mbr_p->mbr_partition[pos].part_start;
+    struct ebr_extended *ebr_actual = malloc(sizeof(struct ebr_extended));
+    /*printf("\n Direccion ebr: %s", val_direccion);*/
+    FILE * lupalogica= fopen(val_direccion, "rb");
+    if (lupalogica != NULL)
+    {
+        fseek(lupalogica, mbr_p->mbr_partition[pos].part_start + 152 ,SEEK_SET);
+        fread(ebr_actual, sizeof(struct ebr_extended), 1, lupalogica);
+        fclose(lupalogica);
+       /* printf("\n Lectura exitosa!!!");
+        printf("\n SEGVAL: %d  %d", ebr_actual->part_start, mbr_p->mbr_partition[pos].part_start);
+        printf("\n SEGVAL: %c", ebr_actual->part_status);*/
+    }else{printf("\n Error!!!");}
+
+    FILE *lapiz;
+    /*if(ebr_actual->part_next != -1)
+    {*/
+        int status = ebr_actual->part_next;
+        lapiz = fopen(ubicacion, "a");
+        fprintf(lapiz, "%s", "EBR");
+        fprintf(lapiz, "%s", "\\nStatus:");
+        fprintf(lapiz, "%c", ebr_actual->part_status);
+        fprintf(lapiz, "%s", " \\nNext_ebr:");
+        fprintf(lapiz, "%d", ebr_actual->part_next);
+        fclose(lapiz);
+        if(ebr_actual->part_status == '1')
+        {
+            lapiz = fopen(ubicacion, "a");
+            fprintf(lapiz, "%s", " | ");
+            fprintf(lapiz, "%s", "LOGICA");
+            fprintf(lapiz, "%s", "\\nTamano:");
+            fprintf(lapiz, "%d", ebr_actual->part_size);
+            fprintf(lapiz, "%s", "\\nNombre:");
+            char *nombre = ebr_actual->part_name;
+            fprintf(lapiz, "%s", nombre);
+            fclose(lapiz);
+        }else
+        {
+            lapiz = fopen(ubicacion, "a");
+            fprintf(lapiz, "%s", " | ");
+            fprintf(lapiz, "%s", "LIBRE");
+            fprintf(lapiz, "%s", "\\nTamano:");
+            fprintf(lapiz, "%d", ebr_actual->part_next);
+            fclose(lapiz);
+        }
+        int result = ebr_actual->part_next - (ebr_actual->part_start + ebr_actual->part_size);
+        if(result != 0)
+        {
+        lapiz = fopen(ubicacion, "a");
+            fprintf(lapiz, "%s", " | ");
+            fprintf(lapiz, "%s", "LIBRE");
+            fprintf(lapiz, "%s", "\\nTamano:");
+            fprintf(lapiz, "%d", result);
+            fclose(lapiz);
+        }
+        if(status != -1)
+        {
+            lupalogica= fopen(val_direccion, "rb");
+            if (lupalogica != NULL)
+            {
+                fseek(lupalogica, ebr_actual->part_next + 152 ,SEEK_SET);
+                fread(ebr_actual, sizeof(struct ebr_extended), 1, lupalogica);
+                fclose(lupalogica);
+            }
+            status = 0;
+            while(status != -1)
+            {
+                int ultimo = 0;
+                lapiz = fopen(ubicacion, "a");
+                fprintf(lapiz, "%s", " | ");
+                fprintf(lapiz, "%s", "EBR");
+                fprintf(lapiz, "%s", "\\nStatus:");
+                fprintf(lapiz, "%c", ebr_actual->part_status);
+                fprintf(lapiz, "%s", "\\nNext:");
+                fprintf(lapiz, "%d", ebr_actual->part_next);
+                fclose(lapiz);
+                if(ebr_actual->part_status == '1')
+                {
+                    lapiz = fopen(ubicacion, "a");
+                    fprintf(lapiz, "%s", " | ");
+                    fprintf(lapiz, "%s", "LOGICA");
+                    fprintf(lapiz, "%s", "\\nTamano:");
+                    fprintf(lapiz, "%d", ebr_actual->part_size);
+                    fprintf(lapiz, "%s", "\\nNombre:");
+                    char *nombre = ebr_actual->part_name;
+                    fprintf(lapiz, "%s", nombre);
+                    fclose(lapiz);
+                }
+                if(ebr_actual->part_next == -1)/*---------------------------SI ES EL ULTIMO------------------------*/
+                {
+                    ultimo = 1;
+                    int resultado = (default_start + default_size) - (ebr_actual->part_start + ebr_actual->part_size);
+                    if(resultado != 0)
+                    {
+                        lapiz = fopen(ubicacion, "a");
+                        fprintf(lapiz, "%s", " | ");
+                        fprintf(lapiz, "%s", "LIBRE");
+                        fprintf(lapiz, "%s", "\\nTamano:");
+                        fprintf(lapiz, "%d", resultado);
+                        fclose(lapiz);
+                    }
+                }/*---------------------------------------------------------------------------------------------------*/
+                int resultado = ebr_actual->part_next - (ebr_actual->part_start + ebr_actual->part_size);
+                if(resultado != 0 && ultimo == 0)
+                {
+                    lapiz = fopen(ubicacion, "a");
+                    fprintf(lapiz, "%s", " | ");
+                    fprintf(lapiz, "%s", "LIBRE");
+                    fprintf(lapiz, "%s", "\\nTamano:");
+                    fprintf(lapiz, "%d", resultado);
+                    fclose(lapiz);
+                }
+                if(ultimo == 1)
+                {
+                    status = -1;
+                }else
+                {
+                    lupalogica= fopen(val_direccion, "rb");
+                    if (lupalogica != NULL)
+                    {
+                        fseek(lupalogica, ebr_actual->part_next + 152 ,SEEK_SET);
+                        fread(ebr_actual, sizeof(struct ebr_extended), 1, lupalogica);
+                        fclose(lupalogica);
+                    }
+                }
+            }
+        }
+        else
+        {
+            if(ebr_actual->part_status == '1')
+            {
+                int resultado = (default_start + default_size) - (ebr_actual->part_start + ebr_actual->part_size);
+                if(resultado != 0)
+                {
+                    lapiz = fopen(ubicacion, "a");
+                    fprintf(lapiz, "%s", " | ");
+                    fprintf(lapiz, "%s", "LIBRE");
+                    fprintf(lapiz, "%s", "\\nTamano:");
+                    fprintf(lapiz, "%d", resultado);
+                    fclose(lapiz);
+                }
+            }else
+            {
+                int resultado = default_size;
+                lapiz = fopen(ubicacion, "a");
+                fprintf(lapiz, "%s", " | ");
+                fprintf(lapiz, "%s", "LIBRE");
+                fprintf(lapiz, "%s", "\\nTamano:");
+                fprintf(lapiz, "%d", resultado);
+                fclose(lapiz);
+            }
+        }
+    /*}
+    else
+    {*/
+        /*printf("\n \n No habian logicas para imprimir.");
+        FILE *lapiz;
+        lapiz = fopen(ubicacion, "a");
+        fprintf(lapiz, "%s", "EXTENDIDA\\n");
+        fprintf(lapiz, "%s", "Tamano:");
+        fprintf(lapiz, "%d", mbr_p->mbr_partition[pos].part_size);
+        fprintf(lapiz, "%s", "\\nNombre:");
+        char *nombre = mbr_p->mbr_partition[pos].part_name;
+        fprintf(lapiz, "%s", nombre);
+        fclose(lapiz);*/
+    /*}*/
+
+    /*lapiz = fopen(ubicacion, "a");
+    fprintf(lapiz, "%s", "PRIMARIA\\n");
+    fprintf(lapiz, "%s", "Tamano:");
+    fprintf(lapiz, "%d", LimSuperior[i]-LimInferior[i]);
+    fprintf(lapiz, "%s", "\\nNombre:");
+    char *nombre = LimNombres[i];
+    fprintf(lapiz, "%s", nombre);
+    fclose(lapiz);*/
+}
+
+void reporte_disk(char *direccion, char *extension, char *ubicacion_original)
+{
+    printf("\n REPORTE DISK\n Extension: %s", extension);
+    char *jpg = "jpg";
+    char *png = "png";
+    char *extensionDot = "dot -Tpng ";
+    char *output = " -o ";
+    if(strcmp(extension, jpg)==0)
+    {
+        extensionDot = "dot -Tjpg ";
+    }if(strcmp(extension, png)==0)
+    {
+        extensionDot = "dot -Tpng ";
+    }
+    cargarArchivoDisco2();
+    setMinimos();
+    char nada[1] ;
+    nada[0] = ' ';
+    char *nombreArchivo = "/reportedisk.dot";
+    char *ubicacion = concatenacion(direccion, nombreArchivo);
+    /*printf("\n [%s]", ubicacion);*/
+    FILE *reporte = fopen(ubicacion, "w");
+    if(reporte != NULL)
+    {
+        fputc(nada[0], reporte);
+        fclose(reporte);
+    }
+    char *cab1 ="digraph disco {";
+    char *cab2="node [shape=record];\n";
+    char *estructura = "\nstruct1 [label =  \"";
+    char *endf ="\"];}";
+    char intTOchar[20];
+    sprintf(intTOchar, "%d", mbr_p->mbr_tamano);
+    char *palabra;
+    FILE *lapiz = fopen(ubicacion, "a");
+    /*num_particiones*/
+    if(lapiz != NULL)
+    {
+        fprintf(lapiz, "%s", cab1);
+        fprintf(lapiz, "%s", cab2);
+        fprintf(lapiz, "%s", estructura);
+        fclose(lapiz);
+        lapiz = fopen(ubicacion, "a");
+        fprintf(lapiz, "%s", "MBR");
+        fprintf(lapiz, "%s", "\\nmbr_tamano: ");
+        fprintf(lapiz, "%d", mbr_p->mbr_tamano);
+        fprintf(lapiz, "%s", "\\nmbr_disk_signature: ");
+        fprintf(lapiz, "%d", mbr_p->mbr_disk_signature);
+        fclose(lapiz);
+        printf("\n NUMERO DE PARTICIONES: %d", num_particiones);
+        if(num_particiones != 0)
+        {
+            int i;
+            for(i=0; i<num_particiones; i++)
+            {
+                if(i == 0)
+                {
+                    if(LimInferior[0] != 0)
+                    {
+                        lapiz = fopen(ubicacion, "a");
+                        fprintf(lapiz, "%s", " | ");
+                        fprintf(lapiz, "%s", "LIBRE");
+                        fprintf(lapiz, "%s", "\\nTamano:");
+                        fprintf(lapiz, "%d", LimInferior[0]);
+                        fclose(lapiz);
+                    }
+                    if(LimTipos[0]=='p')
+                    {
+                        lapiz = fopen(ubicacion, "a");
+                        fprintf(lapiz, "%s", " | ");
+                        fprintf(lapiz, "%s", "PRIMARIA");
+                        fprintf(lapiz, "%s", "\\nTamano:");
+                        fprintf(lapiz, "%d", LimSuperior[0]-LimInferior[0]);
+                        fprintf(lapiz, "%s", "\\nNombre:");
+                        char *nombre = LimNombres[0];
+                        fprintf(lapiz, "%s", nombre);
+                        fclose(lapiz);
+                    }else
+                    {
+                        lapiz = fopen(ubicacion, "a");
+                        fprintf(lapiz, "%s", " | ");
+                        fprintf(lapiz, "%s", "{ EXTENDIDA | {");
+                        fclose(lapiz);
+                        printExtendida(ubicacion);
+                        lapiz = fopen(ubicacion, "a");
+                        fprintf(lapiz, "%s", "} } ");
+                        fclose(lapiz);
+                    }
+                }
+                else
+                {
+                    if(LimInferior[i] != LimSuperior[i-1])
+                    {
+                        lapiz = fopen(ubicacion, "a");
+                        fprintf(lapiz, "%s", " | ");
+                        fprintf(lapiz, "%s", "LIBRE");
+                        fprintf(lapiz, "%s", "\\nTamano:");
+                        fprintf(lapiz, "%d", LimInferior[i]-LimSuperior[i-1]);
+                        printf("\n EXTREMOS DEL ESPACIO LIBRE: %d %d", LimInferior[i], LimSuperior[i-1]);
+                        fclose(lapiz);
+                    }
+                    if(LimTipos[i]=='p')
+                    {
+                        lapiz = fopen(ubicacion, "a");
+                        fprintf(lapiz, "%s", " | ");
+                        fprintf(lapiz, "%s", "PRIMARIA");
+                        fprintf(lapiz, "%s", "\\nTamano:");
+                        fprintf(lapiz, "%d", LimSuperior[i]-LimInferior[i]);
+                        fprintf(lapiz, "%s", "\\nNombre:");
+                        char *nombre = LimNombres[i];
+                        fprintf(lapiz, "%s", nombre);
+                        fclose(lapiz);
+                    }else
+                    {
+                        lapiz = fopen(ubicacion, "a");
+                        fprintf(lapiz, "%s", " | ");
+                        fprintf(lapiz, "%s", "{ EXTENDIDA | {");
+                        fclose(lapiz);
+                        printExtendida(ubicacion);
+                        lapiz = fopen(ubicacion, "a");
+                        fprintf(lapiz, "%s", "} } ");
+                        fclose(lapiz);
+                    }
+                }
+            }
+            if(LimSuperior[num_particiones-1] != mbr_p->mbr_tamano)
+            {
+                printf("\n ESPACIO VACIO EN EL REPORTE DE: %d  %d", mbr_p->mbr_tamano, LimSuperior[num_particiones-1]);
+                lapiz = fopen(ubicacion, "a");
+                fprintf(lapiz, "%s", " | ");
+                fprintf(lapiz, "%s", "LIBRE22");
+                fprintf(lapiz, "%s", "\\nTamano:");
+                fprintf(lapiz, "%d", mbr_p->mbr_tamano - LimSuperior[num_particiones-1]);
+                fclose(lapiz);
+            }
+            lapiz = fopen(ubicacion, "a");
+            fprintf(lapiz, "%s", endf);
+            fclose(lapiz);
+        }else
+        {
+            lapiz = fopen(ubicacion, "a");
+            fprintf(lapiz, "%s", "LIBRE");
+            fprintf(lapiz, "%s", "\\nTamano:");
+            fprintf(lapiz, "%d", mbr_p->mbr_tamano);
+            fclose(lapiz);
+            lapiz = fopen(ubicacion, "a");
+            fprintf(lapiz, "%s", endf);
+            fclose(lapiz);
+        }
+
+    }
+
+    /*################REALIZANDO EL COMANDO################*/
+    char *comando = concatenacion(extensionDot, ubicacion);
+    char *comando2 = concatenacion(comando, output);
+    char *comandoFinal = concatenacion(comando2, ubicacion_original);
+    printf("\n Ejecutando llamada a graphviz = %s", comandoFinal);
+    system(comandoFinal);
+    printf("\n fin");
+}
+
+void generarReporte()
+{
+    printf("\n Ubicacion del reporte: %s", val_direccion);
+    char **extension = str_split(val_direccion, '.');
+    char *ubicacion_original = strdup(val_direccion);
+    asignar_FolderPath(*(extension +1), ubicacion_original);
 }
 
 void montarParticion()
@@ -1740,6 +2693,9 @@ void montarParticion()
                 }
             }
         }
+    }else
+    {
+        printf("\n Verificar logicas, no es p/e");
     }
     printf("\nFin montar particion.");
     /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
@@ -1858,11 +2814,11 @@ void crearDisco()
     char string[32];
     if(val_unit[0] == 'k')
     {
-        t_bytes = 1024 * val_size -1;
+        t_bytes = 1024 * val_size;
     }
     else if(val_unit[0] == 'm')
     {
-        t_bytes = 1024 * 1024 * val_size -1;
+        t_bytes = 1024 * 1024 * val_size ;
     }
 
     if(stat(val_direccion, &st) == -1)
@@ -1914,8 +2870,8 @@ void crearDisco()
         /*FECHA*/
         time_t t = time(NULL);
         struct tm *tm = localtime(&t);
-        primerDisco->mbr_fecha_creacion = t;
-        /*strftime(primerDisco->mbr_fecha_creacion, sizeof(primerDisco->mbr_fecha_creacion), "%c", tm);*/
+        /*primerDisco->mbr_fecha_creacion = tm;*/
+        strftime(primerDisco->mbr_fecha_creacion, sizeof(primerDisco->mbr_fecha_creacion), "%Y/%m/%d %H:%M", tm);
         /*----------------------------------------*/
         /*IDENTIFICADOR UNICO*/
         int signature = rand();
@@ -1962,8 +2918,8 @@ void crearDisco()
         /*FECHA*/
         time_t t = time(NULL);
         struct tm *tm = localtime(&t);
-        primerDisco->mbr_fecha_creacion = t;
-        /*strftime(primerDisco->mbr_fecha_creacion, sizeof(primerDisco->mbr_fecha_creacion), "%c", tm);*/
+        /*primerDisco->mbr_fecha_creacion = tm;*/
+        strftime(primerDisco->mbr_fecha_creacion, sizeof(primerDisco->mbr_fecha_creacion), "%Y/%m/%d %H:%M", tm);
         /*----------------------------------------*/
         /*IDENTIFICADOR UNICO*/
         int signature = rand();
@@ -2013,9 +2969,119 @@ void eliminarDisco()
     }
 }
 
-void minusculas(char **entrada)
+void minusculas(char *entrada)
 {
-    printf("minusculas");
+    printf("\n Convirtiendo a minusculas...");
+    int tamanoo = strlen(entrada);
+    int i;
+    for(i = 0; i< tamanoo; i++)
+    {
+        if(*(entrada +i) == 'A')
+        {
+            *(entrada +i) = 'a';
+        }else if(*(entrada +i) == 'B')
+        {
+
+            *(entrada +i) = 'b';
+        }else if(*(entrada +i) == 'C')
+        {
+
+            *(entrada +i) = 'c';
+        }else if(*(entrada +i) == 'D')
+        {
+            *(entrada +i) = 'd';
+
+        }else if(*(entrada +i) == 'E')
+        {
+            *(entrada +i) = 'e';
+
+        }else if(*(entrada +i) == 'F')
+        {
+            *(entrada +i) = 'f';
+
+        }else if(*(entrada +i) == 'G')
+        {
+            *(entrada +i) = 'g';
+
+        }else if(*(entrada +i) == 'H')
+        {
+            *(entrada +i) = 'h';
+
+        }else if(*(entrada +i) == 'I')
+        {
+            *(entrada +i) = 'i';
+
+        }else if(*(entrada +i) == 'J')
+        {
+            *(entrada +i) = 'j';
+
+        }else if(*(entrada +i) == 'K')
+        {
+            *(entrada +i) = 'k';
+
+        }else if(*(entrada +i) == 'L')
+        {
+            *(entrada +i) = 'l';
+
+        }else if(*(entrada +i) == 'M')
+        {
+            *(entrada +i) = 'm';
+
+        }else if(*(entrada +i) == 'N')
+        {
+            *(entrada +i) = 'n';
+
+        }else if(*(entrada +i) == 'O')
+        {
+            *(entrada +i) = 'o';
+
+        }else if(*(entrada +i) == 'P')
+        {
+            *(entrada +i) = 'p';
+
+        }else if(*(entrada +i) == 'Q')
+        {
+            *(entrada +i) = 'q';
+
+        }else if(*(entrada +i) == 'R')
+        {
+            *(entrada +i) = 'r';
+
+        }else if(*(entrada +i) == 'S')
+        {
+            *(entrada +i) = 's';
+
+        }else if(*(entrada +i) == 'T')
+        {
+            *(entrada +i) = 't';
+
+        }else if(*(entrada +i) == 'U')
+        {
+            *(entrada +i) = 'u';
+
+        }else if(*(entrada +i) == 'V')
+        {
+            *(entrada +i) = 'v';
+
+        }else if(*(entrada +i) == 'W')
+        {
+            *(entrada +i) = 'w';
+
+        }else if(*(entrada +i) == 'X')
+        {
+            *(entrada +i) = 'x';
+
+        }else if(*(entrada +i) == 'Y')
+        {
+            *(entrada +i) = 'y';
+
+        }else if(*(entrada +i) == 'Z')
+        {
+
+            *(entrada +i) = 'z';
+        }
+    }
+    printf("\n Resultado: %s\n-----------------------------", entrada);
 }
 
 /*Contador de elementos*/
@@ -2088,7 +3154,7 @@ int contadorDiagonales(char entrada[])
     printf("\n");*/
         return contadorPuntos;
 }
-char* getComando(char comando[])/*Enviar comando completo, devuelve valor del comando*/
+char* getComando(char *comando)/*Enviar comando completo, devuelve valor del comando*/
 {
     char** ArregloComando;
     ArregloComando = str_split(comando, ':');
@@ -2115,7 +3181,8 @@ char *getValorCadena(char *comando)/*Enviar comando completo, devuelve el valor 
     char** ArregloComando = str_split(comando, ':');
     char* valor = *(ArregloComando +1);
     int i = 0;
-    /*printf("lllllll[%s]",valor, "\n");*/
+    val_tipo_reporte =*(ArregloComando+1);
+    /*printf("\nlllllll[%s]",*(ArregloComando+1));*/
     int tamanio = tamano2(comando);
     for(i = 0; *(valor+i) != '\0' && *(valor+i) != NULL; i++){}
     /*printf("\ntamano\n");
@@ -2178,10 +3245,13 @@ void automata(char** entradaTotal, char* entradaUnica, int posicion)
     printf("\n---------------\n");
     printf("Metodo automata:\n");
     /*-------------------------------------------------*/
+    if (posicion < tamanoArreglo)/*se realizo el split correctamente*/
+    {
     char* token = getComando(*(entradaTotal+posicion));
-    printf("-----\n");
-    printf(*(entradaTotal + posicion));
-    printf("\n-----\n");
+    minusculas(token);
+    printf("\n!-----!\n");
+    printf("[%s]",*(entradaTotal + posicion));
+    printf("\n!-----!\n");
     /*LISTA DE PALABRAS
      RESERVADAS*/
     char *mkdisk = "mkdisk";
@@ -2200,11 +3270,15 @@ void automata(char** entradaTotal, char* entradaUnica, int posicion)
     char *mount= "mount";
     char *unmount= "unmount";
     char *un_id= "-id1";
+    char *rep = "rep";
+    char *id = "-id";
+    char *exec = "exec";
+    char *bs = "\\";
+    char *bs2 = "\\\n";
 
     char *fdisk = "fdisk";
-    printf("TamanoArreglo: %d", tamanoArreglo);
-    if (posicion < tamanoArreglo)/*se realizo el split correctamente*/
-    {
+    printf("TamanoArreglo: %d Token", tamanoArreglo, token);
+
         if(strcmp(token, mkdisk)==0)
         {
             bool_mkdisk = 1;
@@ -2245,7 +3319,7 @@ void automata(char** entradaTotal, char* entradaUnica, int posicion)
             bool_name = 1;
             nombre = getValorDisco(*(entradaTotal + posicion));
             nombre_fdisk = getValorCadena(*(entradaTotal + posicion));
-            printf("\n----\n");printf(nombre_fdisk);
+            printf("\n----NAME:\n");printf(nombre_fdisk);printf("\n----\n");
             automata(entradaTotal,*(entradaTotal + posicion+1), posicion+1);
         }
         else if(strcmp(token, fit)==0)
@@ -2317,6 +3391,28 @@ void automata(char** entradaTotal, char* entradaUnica, int posicion)
             printf("\n RECUPERADO:%s", val_un_id);
             automata(entradaTotal,*(entradaTotal + posicion+1), posicion+1);
         }
+        else if(strcmp(token, rep)==0)
+        {
+            bool_rep = 1;
+            automata(entradaTotal,*(entradaTotal + posicion+1), posicion+1);
+        }
+        else if(strcmp(token, id)==0)
+        {
+            /*bool_rep = 1;*/
+            char **split = str_split(entradaUnica, ':');
+            val_un_id = *(split +1);
+            automata(entradaTotal,*(entradaTotal + posicion+1), posicion+1);
+        }
+        else if(strcmp(token, exec)==0)
+        {
+            bool_exec = 1;
+            val_direccion = *(entradaTotal + posicion+1);
+        }
+        else if(strcmp(token, bs)==0 || strcmp(token, bs2)==0)
+        {
+            bool_bs = 1;
+            printf("\n VINO UN BS!");
+        }
 
     }else
     {
@@ -2326,7 +3422,7 @@ void automata(char** entradaTotal, char* entradaUnica, int posicion)
 
 void master_Driver()
 {
-
+    printf("\n MasterDriver");
     if(bool_mkdisk == 1)
     {
         /*Comando mkdisk utilizado*/
@@ -2374,6 +3470,201 @@ void master_Driver()
     }else if(bool_unmount == 1)
     {
         desmontarParticion();
+    }else if(bool_rep == 1)
+    {
+        generarReporte();
+    }else if(bool_exec == 1)
+    {
+        execute_LBL();
+    }
+}
+
+char* quitarBackSlash(char *entrada)
+{
+    int pos = 0;
+    size_t tamanoo = strlen(entrada);
+    int i;
+    char respuesta[tamanoo-1];
+    int contador = 0;
+    for(i = 0; i< tamanoo; i++)
+    {
+        if(*(entrada+i)!='\\')
+        {
+            respuesta[contador] = *(entrada+i);
+            ++contador;
+        }else
+        {
+            respuesta[contador] = ' ';
+            ++contador;
+        }
+    }
+    char *ptr = respuesta;
+    printf("\nSin el BS: %s" ,ptr);
+    return respuesta;
+
+}
+
+int tieneBS(char *entrada)
+{
+
+    int tienebs = 0;
+    size_t tamanoo = strlen(entrada);
+    int i;
+    printf("\n Tamano cadena %d", tamanoo);
+    for(i = 0; i< tamanoo; i++)
+    {
+        if(*(entrada + i) == '\\')
+        {
+            tienebs = 1;
+            break;
+        }
+    }
+    return tienebs;
+}
+
+int tieneWS(char *entrada)
+{
+    int i;
+    int tamanoo = strlen(entrada);
+    int respuesta = 0;
+    for(i = 0; i<tamanoo; i++)
+    {
+        if(*(entrada + i) == ' ')
+        {
+            respuesta = 1;
+        }
+    }
+    return respuesta;
+}
+
+void execute_LBL()
+{
+    printf("\n exec!: %s\n\n", val_direccion);
+
+    FILE * fp;
+    char * entradaUsuario2 = NULL;
+    size_t len = 0;
+    ssize_t read;
+    int contador_bs = 0;
+    fp = fopen(val_direccion, "r");
+    int crash_b = 0;
+    char *conctncn;
+    if (fp != NULL)
+    {
+        while ((read = getline(&entradaUsuario2, &len, fp)) != -1)
+        {
+
+                /*printf("Linea de largo %zu :\n", read);*/
+                printf("\nFase1 ->%s", entradaUsuario2);
+                if(*(entradaUsuario2) != '#')
+                {
+                    int puntos = contadorPuntos(entradaUsuario2);/*regresa la cant de :'s/2*/
+                    size_t tamanoarray = strlen(entradaUsuario2);
+                    char entrada[tamanoarray-puntos];
+                    if(crash_b == 0)
+                    {
+                        partition_Starter();
+                        crash_b = 1;
+                    }
+                    /*Habiendo definido un nuevo arreglo para la entrada, a la que se le
+                    convertira sustituyendo cada par de dos puntos por uno solo*/
+                    int d;
+                    int paridad = 0;/*simulador de booleano*/
+                    int contador = 0;
+                    for(d = 0; d<tamanoarray+1; d++)
+                    {
+                        if(entradaUsuario2[d] ==':'){
+                            if(paridad == 1)
+                            {
+                                paridad = 0;
+                                entrada[contador] = entradaUsuario2[d];
+                                contador = contador+1;
+                            }else
+                            {
+                                paridad = 1;
+                            }
+                        }else
+                        {
+                            entrada[contador] = entradaUsuario2[d];
+                            contador = contador +1;
+                        }
+
+                    }
+                    /*******************************/
+                    /*Fin reescritura de la entrada*/
+                    /*******************************/
+                    /*******************************/
+                    /*Iniciando el pseudoautomata y el analisis realizado por el mismo*/
+                    /*******************************/
+                    char** tokens;
+                    /*printf("Se ingresó:[%s]\n\n", entrada);*/
+                    tokens = str_split(entrada, ' ');
+                    /*printf("Despues:[%s]\n\n", entrada);*/
+                    tamanoArreglo = tamano(tokens);
+                    printf("\nIniciando el automata...\n");
+                    if(tieneWS(entrada) == 1)
+                    {
+                        automata(tokens, *(tokens + 0), 0);
+                    }else
+                    {
+                        automata(tokens, entrada, 0);
+                    }
+                    if(bool_bs != 1)
+                    {
+                    printf("\n bool_bs::%d", bool_bs);
+                        master_Driver();
+                        /*---------------------------------------------------------*/
+                        bool_add = 0;
+                        bool_deletee = 0;
+                        bool_fdisk = 0;
+                        bool_fit = 0;
+                        bool_mkdisk =  0;
+                        bool_name =  0;
+                        bool_path = 0;
+                        bool_rmdisk = 0;
+                        bool_sizee = 0;
+                        bool_type = 0;
+                        bool_unit = 0;
+                        bool_mount = 0;
+                        bool_unmount = 0;
+                        tamanoArreglo = 0;
+                        bool_id = 0;
+                        particionado_disco_actual = 0;
+                        val_add = 0;
+                        val_delete = 0;
+                        val_size = 0;
+                        bool_rep = 0;
+                        bool_exec = 0;
+
+                        int indice;
+                        for(indice = 0; indice < 4; indice++)
+                        {
+                            minimos1[indice] = 0;
+                            superior[indice] = 0;
+                            LimSuperior[indice] = 0;
+                            LimSuperior[indice] = 0;
+                            EspacioLibre[indice] = 0;
+                            EspacioLibre_max[indice] = 0;
+                            EspacioLibre_min[indice] = 0;
+                        }
+                        EspacioLibre[indice+1] = 0;
+                        EspacioLibre_max[indice+1] = 0;
+                        EspacioLibre_min[indice+1] = 0;
+
+                        val_type[1] = "p";
+                        val_unit[1] = "m";
+                    }/*IF del backslash*/
+                    bool_bs = 0;
+                }
+            }/*While linea por linea*/
+
+
+
+        fclose(fp);
+        if (entradaUsuario2)
+        {
+            free(entradaUsuario2);
+        }
     }
 }
 
@@ -2389,14 +3680,14 @@ int main()
     printf("Universidad de San Carlos de Guatemala\n");
     printf("Ingenieria en Ciencias y Sistemas\n");
     printf("Proyecto: Fase 1\n");
-    printf("                        [File System ext2/ext3]");
+    printf("                        [File System ext2/ext3]\n");
     /*---------------------------------------------------------------*/
     int exit = 0;
     int crash_b = 0;
     while(exit == 0)
     {
         char entradaUsuario[256];
-        printf("\n\n\n Fase1 ->     ");
+        printf("\n Fase1 ->     ");
         fgets(entradaUsuario, sizeof(entradaUsuario), stdin);
         int puntos = contadorPuntos(entradaUsuario);/*regresa la cant de :'s/2*/
         int tamanoarray = tamano2(entradaUsuario);
@@ -2459,10 +3750,13 @@ int main()
         bool_mount = 0;
         bool_unmount = 0;
         tamanoArreglo = 0;
+        bool_id = 0;
         particionado_disco_actual = 0;
         val_add = 0;
         val_delete = 0;
         val_size = 0;
+        bool_rep = 0;
+        bool_exec = 0;
 
         int indice;
         for(indice = 0; indice < 4; indice++)
