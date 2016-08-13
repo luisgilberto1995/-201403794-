@@ -2829,10 +2829,18 @@ void crearDisco()
     }
     else if(val_unit[0] == 'm' || val_unit[0] == 'M')
     {
+<<<<<<< HEAD
         t_bytes = 1024 * 1024 * val_size ;
+=======
+        t_bytes = 1024 * val_size;
+>>>>>>> 5ed15ccb73a5439eb9165db80ed0fb8392bedf9c
     }
     else if(val_unit[0] == 'B' || val_unit[0] == 'b')
     {
+<<<<<<< HEAD
+=======
+        t_bytes = 1024 * 1024 * val_size ;
+>>>>>>> 5ed15ccb73a5439eb9165db80ed0fb8392bedf9c
     }
 
     if(stat(val_direccion, &st) == -1)
