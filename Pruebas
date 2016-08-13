@@ -1,0 +1,72 @@
+//CREAR DISCO
+
+MKDISK -SIZE::50 +UNIT::m -PATH::"/home/ubuntu/Desktop/carp/carp2/carp3" -NAME::"disco.dsk" 
+
+
+mkdisk -size::10 +unit::m -path::"/home/ubuntu/Desktop/karp" -name::"disco2.dsk" 
+
+
+mkdisk -size::50 +unit::m -path::"/home/ubuntu/Desktop/folder1" -name::"disco.dsk" 
+
+//BORRAR DISCO
+
+rmdisk -path::"/home/ubuntu/Desktop/carp1/carp2/carp3/disco.dsk" 
+
+//CREAR PARTICIONES
+
+fdisk -size::3 +type::p +unit::m +fit::wf -path::"/home/ubuntu/Desktop/carp/carp2/carp3/disco.dsk" -name::"p1" 
+
+fdisk -size::5 +type::p +unit::m +fit::wf -path::"/home/ubuntu/Desktop/carp/carp2/carp3/disco.dsk" -name::"p2" 
+
+fdisk -size::24 +type::p +unit::m +fit::wf -path::"/home/ubuntu/Desktop/carp/carp2/carp3/disco.dsk" -name::"p3" 
+
+
+fdisk -size::10 +type::e +unit::m +fit::bf -path::"/home/ubuntu/Desktop/carp/carp2/carp3/disco.dsk" -name::"e" 
+
+
+fdisk -size::2 +type::l +unit::m +fit::wf -path::"/home/ubuntu/Desktop/carp/carp2/carp3/disco.dsk" -name::"l1" 
+
+
+fdisk -size::2 +type::l +unit::m +fit::ff -path::"/home/ubuntu/Desktop/carp/carp2/carp3/disco.dsk" -name::"l2" 
+
+
+fdisk -size::2 +type::l +unit::m +fit::bf -path::"/home/ubuntu/Desktop/carp/carp2/carp3/disco.dsk" -name::"l3" 
+
+fdisk -size::2 +type::l +unit::m +fit::bf -path::"/home/ubuntu/Desktop/carp/carp2/carp3/disco.dsk" -name::"l4" 
+
+
+fdisk -size::10 +unit::m -path::"/home/ubuntu/Desktop/carp1/carp2/carp3/disco.dsk" -name::"particion6" 
+
+//MODIFICAR PARTICIONES
+
+
+fdisk +add::-1 +unit::m -path::"/home/ubuntu/Desktop/carp/carp2/carp3/disco.dsk" -name::"p2" 
+
+
+//ELIMINAR PARTICIONES
+
+
+fdisk -name::"l2" +delete::fast -path::"/home/ubuntu/Desktop/carp/carp2/carp3/disco.dsk" 
+
+//MONTAR PARTICION
+
+mount -path::"/home/ubuntu/Desktop/carp/carp2/carp3/disco.dsk" -name::"p1" 
+
+//DESMONTAR PARTICION
+
+unmount -id1::vda0 
+
+//REPORTE
+
+rep -id::vda0 -path::"/home/ubuntu/Desktop/rep1/rep2/rep3/reporte2.png" -name::disk 
+
+rep -id::vda0 -path::"/home/ubuntu/Desktop/rep1/rep2/rep3/reporte1.png" -name::mbr 
+
+//EXEC
+
+exec /home/ubuntu/Desktop/script.sh 
+
+
+
+
+ 
