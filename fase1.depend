@@ -21,3 +21,15 @@
 	<inttypes.h>
 	<time.h>
 
+1473901520 source:/home/luis/Escritorio/fase1/main.c
+	<stdio.h>
+	<stdlib.h>
+	<string.h>
+	<assert.h>
+	<sys/types.h>
+	<sys/stat.h>
+	<unistd.h>
+	<inttypes.h>
+	<time.h>
+	<math.h>
+
