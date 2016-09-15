@@ -10215,6 +10215,7 @@ void execute_LBL()
                     if(crash_b == 0)
                     {
                         partition_Starter();
+                        user_starter();
                         crash_b = 1;
                     }
                     /*Habiendo definido un nuevo arreglo para la entrada, a la que se le
@@ -10244,6 +10245,25 @@ void execute_LBL()
                     /*******************************/
                     /*Fin reescritura de la entrada*/
                     /*******************************/
+
+                    /**********************************************************************/
+                    /*Sustituyendo los espacios dentro de las comillas por otros simbolos*/
+                    int bool_comilla = 0;
+                    int i;
+                    for(i = 0; i< contador; i++)
+                    {
+                        if(entrada[i] == '"' && bool_comilla == 0)
+                        {
+                            bool_comilla = 1;
+                        }else if (entrada[i] == '"' && bool_comilla == 1)
+                        {
+                            bool_comilla = 0;
+                        }
+                        if(entrada[i] == ' ' && bool_comilla == 1)
+                        {
+                            entrada[i] = '?';
+                        }
+                    }
                     /*******************************/
                     /*Iniciando el pseudoautomata y el analisis realizado por el mismo*/
                     /*******************************/
@@ -10264,48 +10284,48 @@ void execute_LBL()
                     {
                     printf("\n bool_bs::%d", bool_bs);
                         master_Driver();
-        /*---------------------------------------------------------*/
-        bool_add = 0;
-        bool_deletee = 0;
-        bool_fdisk = 0;
-        bool_fit = 0;
-        bool_mkdisk =  0;
-        bool_name =  0;
-        bool_path = 0;
-        bool_rmdisk = 0;
-        bool_sizee = 0;
-        bool_type = 0;
-        bool_unit = 0;
-        bool_mount = 0;
-        bool_unmount = 0;
-        tamanoArreglo = 0;
-        bool_id = 0;
-        particionado_disco_actual = 0;
-        val_add = 0;
-        val_delete = 0;
-        val_size = 0;
-        bool_rep = 0;
-        bool_exec = 0;
-        bool_cont = 0;
-        bool_mkfile = 0;
-        bool_mkdir = 0;
-        bool_cat = 0;
-        bool_login = 0;
-        bool_mkgrp = 0;
-        bool_mkusr = 0;
-        bool_rmgrp = 0;
-        bool_rmusr = 0;
-        bool_mkfs = 0;
-        total_armado = "";
-        total_recuperado = "";
-        bool_loss = 0;
-        bool_recovery = 0;
-        bool_edit = 0;
-        bool_ls_i =0;
-        bool_plus_r = 0;
-        bool_chmod = 0;
-        bool_edit = 0;
-        bool_file_rename = 0;
+                    /*---------------------------------------------------------*/
+                    bool_add = 0;
+                    bool_deletee = 0;
+                    bool_fdisk = 0;
+                    bool_fit = 0;
+                    bool_mkdisk =  0;
+                    bool_name =  0;
+                    bool_path = 0;
+                    bool_rmdisk = 0;
+                    bool_sizee = 0;
+                    bool_type = 0;
+                    bool_unit = 0;
+                    bool_mount = 0;
+                    bool_unmount = 0;
+                    tamanoArreglo = 0;
+                    bool_id = 0;
+                    particionado_disco_actual = 0;
+                    val_add = 0;
+                    val_delete = 0;
+                    val_size = 0;
+                    bool_rep = 0;
+                    bool_exec = 0;
+                    bool_cont = 0;
+                    bool_mkfile = 0;
+                    bool_mkdir = 0;
+                    bool_cat = 0;
+                    bool_login = 0;
+                    bool_mkgrp = 0;
+                    bool_mkusr = 0;
+                    bool_rmgrp = 0;
+                    bool_rmusr = 0;
+                    bool_mkfs = 0;
+                    total_armado = "";
+                    total_recuperado = "";
+                    bool_loss = 0;
+                    bool_recovery = 0;
+                    bool_edit = 0;
+                    bool_ls_i =0;
+                    bool_plus_r = 0;
+                    bool_chmod = 0;
+                    bool_edit = 0;
+                    bool_file_rename = 0;
 
                         int indice;
                         for(indice = 0; indice < 4; indice++)
@@ -10328,9 +10348,6 @@ void execute_LBL()
                     bool_bs = 0;
                 }
             }/*While linea por linea*/
-
-
-
         fclose(fp);
         if (entradaUsuario2)
         {
