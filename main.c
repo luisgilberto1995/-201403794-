@@ -1157,6 +1157,10 @@ void modificarParticion()
     setMinimos();
     printf("\nModificando particion...\nBuscando en primarias y extendidas");
     /************************************************************************/
+<<<<<<< HEAD
+=======
+    val_unit[0] == 'k';
+>>>>>>> faedadfbee8395855b7d093a0280700f6a33c6ef
     if(val_unit[0] == 'k' || val_unit[0] == 'K')
     {
         val_add = 1024 * val_add ;
@@ -1167,6 +1171,11 @@ void modificarParticion()
     }
     else if(val_unit[0] == 'b' || val_unit[0] == 'B')
     {
+<<<<<<< HEAD
+=======
+
+    }
+>>>>>>> faedadfbee8395855b7d093a0280700f6a33c6ef
 
     }
     /************************************************************************/
@@ -1617,6 +1626,11 @@ void crearParticion()
         /*Escribir MBR*/
         int min_byte = 1024 * 1024 * 2 ;
         int t_bytes = 0;
+<<<<<<< HEAD
+=======
+        /*printf("!!!%c!!!" ,val_unit[0]);*/
+        val_unit[0] = 'k';
+>>>>>>> faedadfbee8395855b7d093a0280700f6a33c6ef
         if(val_unit[0] == 'k' || val_unit[0] == 'K')
         {
             t_bytes = 1024 * val_size ;
@@ -4945,13 +4959,31 @@ void crearDisco()
     int t_bytes = 0;
     struct stat st = {0};
     char string[32];
+<<<<<<< HEAD
+=======
+    val_unit[0] = 'm';
+>>>>>>> faedadfbee8395855b7d093a0280700f6a33c6ef
     if(val_unit[0] == 'k' || val_unit[0] == 'K')
     {
         t_bytes = 1024 * val_size;
     }
     else if(val_unit[0] == 'm' || val_unit[0] == 'M')
+<<<<<<< HEAD
+=======
     {
+<<<<<<< HEAD
         t_bytes = 1024 * 1024 * val_size ;
+=======
+        t_bytes = 1024 * val_size;
+>>>>>>> 5ed15ccb73a5439eb9165db80ed0fb8392bedf9c
+    }
+    else if(val_unit[0] == 'B' || val_unit[0] == 'b')
+>>>>>>> faedadfbee8395855b7d093a0280700f6a33c6ef
+    {
+<<<<<<< HEAD
+=======
+        t_bytes = 1024 * 1024 * val_size ;
+>>>>>>> 5ed15ccb73a5439eb9165db80ed0fb8392bedf9c
     }
     else if(val_unit[0] == 'B' || val_unit[0] == 'b')
     {
